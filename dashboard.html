@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Group 7 · Study dashboard</title>
+<style>
+.viz-root {
+  color-scheme: light;
+  --surface-0: #f3f3f1;
+  --surface-1: #fcfcfb;
+  --line: #e2e1dc;
+  --grid: #ecebe7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #77766f;
+  --series-1: #2a78d6;   /* Suggest */
+  --series-2: #eb6834;   /* Pre-select */
+  --neutral-mark: #a8a7a0;
+  --good: #1a7f37; --good-bg: #e7f4ea;
+  --bad: #b42318;  --bad-bg: #fdecea;
+  --warn: #8a5a00; --warn-bg: #fff4d6;
+  --accent: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  .viz-root {
+    color-scheme: dark;
+    --surface-0: #111110;
+    --surface-1: #1a1a19;
+    --line: #34332f;
+    --grid: #2a2a27;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #94938a;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --neutral-mark: #6b6a63;
+    --good: #6fcf8a; --good-bg: #183322;
+    --bad: #ff8a80;  --bad-bg: #3a1a17;
+    --warn: #f0c060; --warn-bg: #3a2e10;
+    --accent: #3987e5;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.viz-root { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: var(--surface-0);
+  color: var(--text-primary); min-height: 100vh; padding: 20px; font-size: 14px; }
+.wrap { max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
+h2 { font-size: 17px; margin: 0 0 4px; font-weight: 650; }
+h3 { font-size: 14px; margin: 14px 0 6px; font-weight: 650; }
+.sub { color: var(--text-secondary); margin: 0 0 16px; }
+.panel { background: var(--surface-1); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.controls input[type=text], .controls input[type=password] { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface-0); color: var(--text-primary); min-width: 220px; flex: 1; font: inherit; }
+button, .filebtn { font: inherit; border: 1px solid var(--line); background: var(--surface-0); color: var(--text-primary);
+  padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.filebtn input { display: none; }
+label.toggle { display: inline-flex; gap: 6px; align-items: center; color: var(--text-secondary); }
+.msg { margin-top: 8px; color: var(--text-secondary); min-height: 1.2em; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile { background: var(--surface-1); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.tile .k { color: var(--text-secondary); font-size: 12px; }
+.tile .v { font-size: 28px; font-weight: 600; margin-top: 2px; }
+.tile .d { color: var(--text-muted); font-size: 12px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+.verdict { border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-weight: 500; }
+.verdict.good { background: var(--good-bg); color: var(--good); }
+.verdict.bad { background: var(--bad-bg); color: var(--bad); }
+.verdict.warn { background: var(--warn-bg); color: var(--warn); }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--text-secondary); font-weight: 600; font-size: 12px; }
+td.num, th.num { text-align: right; }
+.scroll { overflow-x: auto; }
+.statline { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--surface-0);
+  border-radius: 8px; padding: 8px 10px; margin: 6px 0; white-space: pre-wrap; }
+.flag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--bad-bg); color: var(--bad); margin-right: 3px; }
+.okflag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--good-bg); color: var(--good); }
+.legend { display: flex; gap: 14px; color: var(--text-secondary); font-size: 12px; margin: 4px 0; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+svg text { fill: var(--text-secondary); font-size: 11px; }
+svg .val { fill: var(--text-primary); font-size: 12px; font-weight: 600; }
+.tip { position: fixed; pointer-events: none; background: var(--text-primary); color: var(--surface-1); padding: 6px 8px;
+  border-radius: 6px; font-size: 12px; display: none; z-index: 10; max-width: 260px; }
+.note { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
+.empty { color: var(--text-muted); padding: 20px 0; text-align: center; }
+details summary { cursor: pointer; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="viz-root">
+<div class="wrap">
+  <h1>Suggest or pre-select? — study dashboard</h1>
+  <p class="sub">Group 7 · COMP41740. Loads the Responses data, applies the pre-registered exclusions and runs every planned test.</p>
+
+  <div class="panel">
+    <div class="controls">
+      <input type="text" id="url" placeholder="Apps Script web-app URL (…/exec)">
+      <input type="password" id="key" placeholder="Dashboard key" style="max-width:220px;min-width:160px">
+      <button class="primary" id="load">Load from Google Sheet</button>
+      <label class="toggle"><input type="checkbox" id="auto"> auto-refresh (20 s)</label>
+    </div>
+    <div class="controls" style="margin-top:8px">
+      <label class="filebtn">Load CSV file…<input type="file" id="file" accept=".csv,text/csv"></label>
+      <button id="local">Use demo data from this browser</button>
+      <button id="sim">Simulate 16 participants</button>
+      <span style="flex:1"></span>
+      <span style="color:var(--text-secondary)">Include:</span>
+      <label class="toggle"><input type="checkbox" class="mode" value="live" checked> live</label>
+      <label class="toggle"><input type="checkbox" class="mode" value="pilot"> pilot</label>
+      <label class="toggle"><input type="checkbox" class="mode" value="demo" checked> demo/simulated</label>
+    </div>
+    <div class="msg" id="msg">No data loaded yet.</div>
+  </div>
+
+  <div id="out"></div>
+</div>
+<div class="tip" id="tip"></div>
+</div>
+
+<script>
+/* =====================================================================
+   STATISTICS  (checked against scipy — see analysis.py / README)
+   ===================================================================== */
+const St = {};
+St.mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+St.sd = a => { const m = St.mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
+St.quantile = (a, q) => { const s = [...a].sort((x, y) => x - y), h = (s.length - 1) * q, lo = Math.floor(h);
+  return s[lo] + (h - lo) * ((s[lo + 1] ?? s[lo]) - s[lo]); };
+St.median = a => St.quantile(a, 0.5);
+
+St.lgamma = x => {
+  const g = 7, c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  if (x < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * x))) - St.lgamma(1 - x);
+  x -= 1; let a = c[0]; const t = x + g + 0.5;
+  for (let i = 1; i < 9; i++) a += c[i] / (x + i);
+  return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+};
+function betacf(a, b, x) {
+  const MAXIT = 300, EPS = 3e-16, FPMIN = 1e-300;
+  let qab = a + b, qap = a + 1, qam = a - 1, c = 1, d = 1 - qab * x / qap;
+  if (Math.abs(d) < FPMIN) d = FPMIN; d = 1 / d; let h = d;
+  for (let m = 1; m <= MAXIT; m++) {
+    const m2 = 2 * m; let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d; h *= d * c;
+    aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d; const del = d * c; h *= del; if (Math.abs(del - 1) < EPS) break;
+  }
+  return h;
+}
+// Regularised incomplete beta I_x(a, b)
+St.ibeta = (x, a, b) => {
+  if (x <= 0) return 0; if (x >= 1) return 1;
+  const bt = Math.exp(St.lgamma(a + b) - St.lgamma(a) - St.lgamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+  return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b;
+};
+St.tSf = (t, df) => { const p = 0.5 * St.ibeta(df / (df + t * t), df / 2, 0.5); return t > 0 ? p : 1 - p; };  // P(T > t)
+St.tInv = (p, df) => { let lo = -1e3, hi = 1e3; for (let i = 0; i < 200; i++) { const m = (lo + hi) / 2; (1 - St.tSf(m, df) < p) ? lo = m : hi = m; } return (lo + hi) / 2; };
+St.fSf = (F, d1, d2) => F <= 0 ? 1 : St.ibeta(d2 / (d2 + d1 * F), d2 / 2, d1 / 2);
+St.erfc = x => {   // Numerical Recipes erfcc, |err| < 1.2e-7
+  const z = Math.abs(x), t = 1 / (1 + 0.5 * z);
+  const r = t * Math.exp(-z * z - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 +
+    t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))));
+  return x >= 0 ? r : 2 - r;
+};
+St.normCdf = z => 0.5 * St.erfc(-z / Math.SQRT2);
+St.qnorm = p => {  // Acklam
+  const a = [-3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.383577518672690e2, -3.066479806614716e1, 2.506628277459239],
+    b = [-5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2, 6.680131188771972e1, -1.328068155288572e1],
+    c = [-7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783],
+    d = [7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996, 3.754408661907416];
+  const pl = 0.02425;
+  if (p < pl) { const q = Math.sqrt(-2 * Math.log(p)); return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+  if (p > 1 - pl) { const q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+  const q = p - 0.5, r = q * q;
+  return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+};
+
+// Shapiro–Wilk W test (Royston 1992/1995 approximation, as in R and scipy)
+St.shapiro = x0 => {
+  const x = [...x0].sort((a, b) => a - b), n = x.length;
+  if (n < 3) return { W: NaN, p: NaN };
+  const range = x[n - 1] - x[0];
+  if (range === 0) return { W: NaN, p: NaN, note: 'all values identical' };
+  const m = Array.from({ length: n }, (_, i) => St.qnorm((i + 1 - 0.375) / (n + 0.25)));
+  const mm = m.reduce((s, v) => s + v * v, 0), u = 1 / Math.sqrt(n);
+  const poly = (cs, z) => cs.reduce((s, c, i) => s + c * z ** i, 0);
+  const a = new Array(n).fill(0);
+  if (n === 3) { a[0] = -Math.SQRT1_2; a[2] = Math.SQRT1_2; }
+  else {
+    const an = m[n - 1] / Math.sqrt(mm) + poly([0, 0.221157, -0.147981, -2.071190, 4.434685, -2.706056], u);
+    let eps, start;
+    if (n > 5) {
+      const an1 = m[n - 2] / Math.sqrt(mm) + poly([0, 0.042981, -0.293762, -1.752461, 5.682633, -3.582633], u);
+      eps = (mm - 2 * m[n - 1] ** 2 - 2 * m[n - 2] ** 2) / (1 - 2 * an ** 2 - 2 * an1 ** 2);
+      a[n - 1] = an; a[0] = -an; a[n - 2] = an1; a[1] = -an1; start = 2;
+    } else {
+      eps = (mm - 2 * m[n - 1] ** 2) / (1 - 2 * an ** 2);
+      a[n - 1] = an; a[0] = -an; start = 1;
+    }
+    for (let i = start; i < n - start; i++) a[i] = m[i] / Math.sqrt(eps);
+  }
+  const mean = St.mean(x);
+  const num = a.reduce((s, ai, i) => s + ai * x[i], 0) ** 2;
+  const den = x.reduce((s, v) => s + (v - mean) ** 2, 0);
+  let W = Math.min(1, num / den), p;
+  if (n === 3) { p = Math.max(0, 6 / Math.PI * (Math.asin(Math.sqrt(W)) - Math.asin(Math.sqrt(0.75)))); }
+  else if (n <= 11) {
+    const g = -2.273 + 0.459 * n, mu = 0.5440 - 0.39978 * n + 0.025054 * n ** 2 - 0.0006714 * n ** 3;
+    const sig = Math.exp(1.3822 - 0.77857 * n + 0.062767 * n ** 2 - 0.0020322 * n ** 3);
+    const inner = g - Math.log(1 - W);
+    p = inner <= 0 ? 1e-99 : 1 - St.normCdf((-Math.log(inner) - mu) / sig);
+  } else {
+    const ln = Math.log(n), mu = -1.5861 - 0.31082 * ln - 0.083751 * ln ** 2 + 0.0038915 * ln ** 3;
+    const sig = Math.exp(-0.4803 - 0.082676 * ln + 0.0030302 * ln ** 2);
+    p = 1 - St.normCdf((Math.log(1 - W) - mu) / sig);
+  }
+  return { W, p };
+};
+
+// Paired / one-sample t-test on differences (alternative: mean > 0)
+St.pairedT = d => {
+  const n = d.length, m = St.mean(d), s = St.sd(d), se = s / Math.sqrt(n), df = n - 1;
+  const t = m / se, tc = St.tInv(0.975, df), dz = m / s, seD = Math.sqrt(1 / n + dz * dz / (2 * n));
+  return { n, mean: m, sd: s, t, df, pGreater: St.tSf(t, df), pTwo: 2 * Math.min(St.tSf(t, df), 1 - St.tSf(t, df)),
+    ci: [m - tc * se, m + tc * se], dz, dzCi: [dz - tc * seD, dz + tc * seD] };
+};
+
+// Wilcoxon signed-rank on differences (zeros dropped, like scipy zero_method="wilcox")
+St.wilcoxon = d0 => {
+  const d = d0.filter(v => v !== 0), n = d.length;
+  if (n === 0) return { n: 0, nZero: d0.length };
+  const abs = d.map(Math.abs), order = abs.map((v, i) => i).sort((i, j) => abs[i] - abs[j]);
+  const ranks = new Array(n); let tieTerm = 0, hasTies = false;
+  for (let i = 0; i < n;) {
+    let j = i; while (j + 1 < n && abs[order[j + 1]] === abs[order[i]]) j++;
+    const r = (i + j) / 2 + 1, t = j - i + 1; if (t > 1) { hasTies = true; tieTerm += t ** 3 - t; }
+    for (let k = i; k <= j; k++) ranks[order[k]] = r; i = j + 1;
+  }
+  const Wp = d.reduce((s, v, i) => s + (v > 0 ? ranks[i] : 0), 0), Wm = n * (n + 1) / 2 - Wp;
+  const mu = n * (n + 1) / 4, sigma = Math.sqrt(n * (n + 1) * (2 * n + 1) / 24 - tieTerm / 48);
+  const z = sigma > 0 ? (Wp - mu) / sigma : 0;
+  let pGreater, pLess, exact = false;
+  if (!hasTies && n <= 50 && d.length === d0.length) {
+    exact = true;   // exact null distribution of W+ by counting subsets
+    const max = n * (n + 1) / 2, cnt = new Array(max + 1).fill(0); cnt[0] = 1;
+    for (let k = 1; k <= n; k++) for (let s = max; s >= k; s--) cnt[s] += cnt[s - k];
+    const tot = 2 ** n; let le = 0, ge = 0;
+    for (let s = 0; s <= max; s++) { if (s <= Wp) le += cnt[s]; if (s >= Wp) ge += cnt[s]; }
+    pGreater = ge / tot; pLess = le / tot;
+  } else { pGreater = 1 - St.normCdf(z); pLess = St.normCdf(z); }
+  return { n, nZero: d0.length - n, Wplus: Wp, Wminus: Wm, W: Math.min(Wp, Wm), z, exact,
+    pGreater, pLess, pTwo: Math.min(1, 2 * Math.min(pGreater, pLess)), r: Math.abs(z) / Math.sqrt(n) };
+};
+
+// Independent-samples t (pooled or Welch). Returns t for mean(x) − mean(y).
+St.indT = (x, y, welch) => {
+  const n1 = x.length, n2 = y.length, m1 = St.mean(x), m2 = St.mean(y), v1 = St.sd(x) ** 2, v2 = St.sd(y) ** 2;
+  let se, df;
+  if (welch) { se = Math.sqrt(v1 / n1 + v2 / n2); df = (v1 / n1 + v2 / n2) ** 2 / ((v1 / n1) ** 2 / (n1 - 1) + (v2 / n2) ** 2 / (n2 - 1)); }
+  else { const sp = ((n1 - 1) * v1 + (n2 - 1) * v2) / (n1 + n2 - 2); se = Math.sqrt(sp * (1 / n1 + 1 / n2)); df = n1 + n2 - 2; }
+  const t = (m1 - m2) / se;
+  return { t, df, pGreater: St.tSf(t, df), pTwo: 2 * Math.min(St.tSf(t, df), 1 - St.tSf(t, df)), m1, m2, n1, n2 };
+};
+// 1-df effect as F from a t statistic
+const asF = (t, df2) => { const F = t * t; return { F, df1: 1, df2, p: St.fSf(F, 1, df2), eta: F / (F + df2) }; };
+
+/* =====================================================================
+   DATA → ONE SUMMARY PER PARTICIPANT
+   ===================================================================== */
+const LABEL = { 0: 'Safe', 33: 'Probably safe', 67: 'Probably phishing', 100: 'Phishing' };
+const num = v => (v === '' || v === null || v === undefined) ? NaN : Number(v);
+const side = v => v >= 67 ? 'phish' : 'safe';
+const COND = ['suggest', 'preselect'];
+const CNAME = { suggest: 'Suggest', preselect: 'Pre-select' };
+
+function summarise(rawRows) {
+  // de-duplicate (a phone can resend) and keep the latest answer per item
+  const seen = new Set(), rows = [];
+  for (const r of rawRows) { if (!r.row_id || seen.has(r.row_id)) continue; seen.add(r.row_id); rows.push(r); }
+  rows.sort((a, b) => String(a.client_time).localeCompare(String(b.client_time)));
+  const byP = new Map();
+  for (const r of rows) {
+    if (!byP.has(r.participant)) byP.set(r.participant, new Map());
+    byP.get(r.participant).set(`${r.item_type}|${r.item_id}|${r.round}`, r);
+  }
+  const people = [];
+  for (const [pid, items] of byP) {
+    const rs = [...items.values()], first = rs[0];
+    const P = { id: pid, version: num(first.version), attempt: num(first.attempt), mode: first.mode,
+      started: first.client_time, cond: {}, flags: [] };
+    const emails = rs.filter(r => r.item_type === 'email');
+    const r1 = emails.find(r => num(r.round) === 1);
+    P.order = r1 ? (r1.condition === 'suggest' ? 'Suggest first' : 'Pre-select first') : '';
+    let complete = true;
+    for (const c of COND) {
+      const e = emails.filter(r => r.condition === c);
+      const wrong = e.filter(r => num(r.ai_correct) === 0), right = e.filter(r => num(r.ai_correct) === 1);
+      const agree = r => 100 - Math.abs(num(r.final) - num(r.ai_rating));
+      const ag = rs.filter(r => r.item_type === 'agency' && r.condition === c);
+      const att = rs.find(r => r.item_type === 'attention' && r.condition === c);
+      const ms = e.map(r => num(r.ms));
+      P.cond[c] = {
+        n: e.length, round: e[0] ? num(e[0].round) : NaN, set: e[0] ? e[0].email_set : '',
+        agreeWrong: wrong.length ? St.mean(wrong.map(agree)) : NaN,
+        agreeRight: right.length ? St.mean(right.map(agree)) : NaN,
+        acceptedWrong: wrong.filter(r => side(num(r.final)) === side(num(r.ai_rating))).length,
+        accuracy: e.filter(r => side(num(r.final)) === (r.truth === 'phishing' ? 'phish' : 'safe')).length,
+        agency: ag.length === 2 ? num(ag[0].final) + num(ag[1].final) : NaN,
+        attention: att ? att.status : '',
+        medianMs: ms.length ? St.median(ms) : NaN,
+        changedRate: c === 'preselect' && e.length ? St.mean(e.map(r => num(r.changed))) : NaN,
+      };
+      if (e.length !== 10 || wrong.length !== 3 || ag.length !== 2 || !att) complete = false;
+    }
+    const man = rs.find(r => r.item_type === 'manipulation'), cred = rs.find(r => r.item_type === 'credibility');
+    P.manipulation = man ? man.status : '';
+    P.credibility = cred ? cred.final : '';
+    P.complete = complete;
+    if (!complete) P.flags.push('incomplete');
+    if (COND.some(c => P.cond[c].attention === 'fail')) P.flags.push('attention check');
+    if (COND.some(c => P.cond[c].medianMs < 2000)) P.flags.push('median < 2 s');
+    if (P.attempt > 1) P.flags.push('repeat attempt');
+    P.included = P.flags.length === 0;
+    people.push(P);
+  }
+  people.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  return { rows, people };
+}
+
+/* =====================================================================
+   ANALYSIS
+   ===================================================================== */
+function analyse(people) {
+  const inc = people.filter(p => p.included), n = inc.length, A = { n };
+  if (n < 3) return A;
+  const S = inc.map(p => p.cond.suggest), Pz = inc.map(p => p.cond.preselect);
+  // H1
+  const d1 = inc.map(p => p.cond.preselect.agreeWrong - p.cond.suggest.agreeWrong);
+  A.h1 = { sug: S.map(c => c.agreeWrong), pre: Pz.map(c => c.agreeWrong), diff: d1,
+    shapiro: St.shapiro(d1), t: St.pairedT(d1), w: St.wilcoxon(d1) };
+  A.h1.useT = !(A.h1.shapiro.p < 0.05);
+  A.h1.extraPer10 = St.mean(inc.map(p => p.cond.preselect.acceptedWrong - p.cond.suggest.acceptedWrong));
+  A.h1.acceptRate = { sug: St.mean(S.map(c => c.acceptedWrong / 3)), pre: St.mean(Pz.map(c => c.acceptedWrong / 3)) };
+  // H2 (predicted lower under Pre-select)
+  const d2 = inc.map(p => p.cond.preselect.agency - p.cond.suggest.agency);
+  A.h2 = { sug: S.map(c => c.agency), pre: Pz.map(c => c.agency), diff: d2, w: St.wilcoxon(d2) };
+  // Exploratory 2×2 RM ANOVA: initiative × AI correctness, via 1-df contrasts
+  const cell = (p, c, k) => p.cond[c][k];
+  const ini = inc.map(p => (cell(p, 'preselect', 'agreeWrong') + cell(p, 'preselect', 'agreeRight')) / 2 - (cell(p, 'suggest', 'agreeWrong') + cell(p, 'suggest', 'agreeRight')) / 2);
+  const cor = inc.map(p => (cell(p, 'suggest', 'agreeWrong') + cell(p, 'preselect', 'agreeWrong')) / 2 - (cell(p, 'suggest', 'agreeRight') + cell(p, 'preselect', 'agreeRight')) / 2);
+  const ixn = inc.map(p => (cell(p, 'preselect', 'agreeWrong') - cell(p, 'suggest', 'agreeWrong')) - (cell(p, 'preselect', 'agreeRight') - cell(p, 'suggest', 'agreeRight')));
+  const cF = c => St.sd(c) > 0 ? asF(St.mean(c) / (St.sd(c) / Math.sqrt(n)), n - 1) : null;
+  A.ex = { initiative: cF(ini), correctness: cF(cor), interaction: cF(ixn),
+    cells: { suggest: { wrong: St.mean(S.map(c => c.agreeWrong)), right: St.mean(S.map(c => c.agreeRight)) },
+             preselect: { wrong: St.mean(Pz.map(c => c.agreeWrong)), right: St.mean(Pz.map(c => c.agreeRight)) } } };
+  // Order: 2×2 mixed ANOVA (condition within × order between)
+  const g1 = inc.filter(p => p.order === 'Suggest first'), g2 = inc.filter(p => p.order === 'Pre-select first');
+  if (g1.length >= 2 && g2.length >= 2) {
+    const dd = g => g.map(p => p.cond.preselect.agreeWrong - p.cond.suggest.agreeWrong);
+    const av = g => g.map(p => (p.cond.preselect.agreeWrong + p.cond.suggest.agreeWrong) / 2);
+    const ti = St.indT(dd(g1), dd(g2), false), to = St.indT(av(g1), av(g2), false);
+    const v1 = St.sd(dd(g1)) ** 2, v2 = St.sd(dd(g2)) ** 2, sp = ((g1.length - 1) * v1 + (g2.length - 1) * v2) / (n - 2);
+    const est = (St.mean(dd(g1)) + St.mean(dd(g2))) / 2, se = Math.sqrt(sp / 4 * (1 / g1.length + 1 / g2.length));
+    A.order = { n1: g1.length, n2: g2.length, condition: asF(est / se, n - 2), order: asF(to.t, n - 2), interaction: asF(ti.t, n - 2) };
+    // Round-1-only between-subjects fallback (Welch), Pre-select > Suggest
+    A.round1 = St.indT(g2.map(p => p.cond.preselect.agreeWrong), g1.map(p => p.cond.suggest.agreeWrong), true);
+  }
+  // Checks
+  A.checks = {
+    manipulationPass: inc.filter(p => p.manipulation === 'pass').length,
+    credibility: ['Yes', 'Unsure', 'No'].map(k => [k, inc.filter(p => p.credibility === k).length]),
+    changedRate: St.mean(Pz.map(c => c.changedRate)),
+    medianMs: { suggest: St.median(S.map(c => c.medianMs)), preselect: St.median(Pz.map(c => c.medianMs)) },
+    accuracy: { suggest: St.mean(S.map(c => c.accuracy)), preselect: St.mean(Pz.map(c => c.accuracy)) },
+  };
+  return A;
+}
+
+/* =====================================================================
+   RENDERING
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const f = (x, d = 2) => Number.isFinite(x) ? x.toFixed(d) : '–';
+const fp = p => !Number.isFinite(p) ? '–' : p < 0.001 ? '< .001' : p.toFixed(3).replace(/^0/, '');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const css = v => getComputedStyle(document.querySelector('.viz-root')).getPropertyValue(v).trim();
+
+let DATA = { rows: [], people: [] };
+
+function render() {
+  const modes = [...document.querySelectorAll('.mode:checked')].map(x => x.value);
+  const rows = DATA.rawRows ? DATA.rawRows.filter(r => modes.includes(r.mode)) : [];
+  const { people } = summarise(rows);
+  DATA.people = people;
+  const out = $('out');
+  if (!people.length) { out.innerHTML = `<div class="panel empty">No participants in the selected data.</div>`; return; }
+  const A = analyse(people);
+  const completed = people.filter(p => p.complete).length;
+  const excl = people.filter(p => p.complete && !p.included).length;
+  const versionCounts = [1, 2, 3, 4].map(v => people.filter(p => p.included && p.version === v).length);
+
+  out.innerHTML = `
+    <div class="tiles" style="margin-bottom:16px">
+      ${tile('Started', people.length, '')}
+      ${tile('Completed both rounds', completed, `${people.length - completed} in progress / dropped`)}
+      ${tile('Included in analysis', A.n, `minimum 12 · target 16–20`)}
+      ${tile('Excluded', excl, 'attention, speed or repeat')}
+      ${tile('Versions 1/2/3/4', versionCounts.join(' / '), 'included participants')}
+    </div>
+    ${A.n < 3 ? `<div class="panel empty">Statistics appear once at least 3 participants are included (currently ${A.n}).</div>` : `
+    ${h1Panel(A)}
+    ${h2Panel(A)}
+    <div class="grid2">${exPanel(A)}${orderPanel(A)}</div>
+    ${checksPanel(A)}`}
+    ${participantsPanel(people)}
+    ${emailsPanel(rows, people)}`;
+  bindTips();
+  $('dlSummary') && ($('dlSummary').onclick = () => downloadSummary(people));
+  $('dlRows') && ($('dlRows').onclick = () => downloadRows(rows));
+}
+const tile = (k, v, d) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+
+function h1Panel(A) {
+  const h = A.h1, t = h.t, w = h.w, sig = h.useT ? t.pGreater < 0.05 : w.pGreater < 0.05;
+  const testName = h.useT ? 'paired t-test (one-tailed)' : 'Wilcoxon signed-rank (one-tailed)';
+  const mS = St.mean(h.sug), mP = St.mean(h.pre);
+  return `<div class="panel">
+    <h2>H1 · Agreement with the AI on its wrong verdicts</h2>
+    <div class="verdict ${sig ? 'good' : 'bad'}">${sig ? 'H1 supported' : 'H1 not supported'}: agreement on AI-wrong emails was
+      ${f(mP, 1)} under Pre-select vs ${f(mS, 1)} under Suggest (difference ${f(t.mean, 1)} points; ${testName}, p ${fp(h.useT ? t.pGreater : w.pGreater)}, n = ${A.n}).</div>
+    <div class="grid2">
+      <div><h3>Mean agreement per condition (whiskers = 1 SD)</h3>${barChart([
+          { key: 'suggest', label: 'Suggest', vals: h.sug }, { key: 'preselect', label: 'Pre-select', vals: h.pre }], 0, 100, 'agreement')}</div>
+      <div><h3>Each participant (line joins their two rounds)</h3>${pairedPlot(h.sug, h.pre, 0, 100, A)}</div>
+    </div>
+    <h3>Pre-registered test</h3>
+    <div class="statline">Shapiro–Wilk on paired differences: W = ${f(h.shapiro.W, 3)}, p ${fp(h.shapiro.p)} → ${h.shapiro.note ? h.shapiro.note + ' → ' : ''}${h.useT ? 'differences near-normal → paired t-test' : 'non-normal → Wilcoxon'}
+Paired t: M = ${f(t.mean)}, SD = ${f(t.sd)}, t(${t.df}) = ${f(t.t, 3)}, p one-tailed ${fp(t.pGreater)}, two-tailed ${fp(t.pTwo)}, d_z = ${f(t.dz)} [95% CI ${f(t.dzCi[0])}, ${f(t.dzCi[1])}], mean diff 95% CI [${f(t.ci[0], 1)}, ${f(t.ci[1], 1)}]
+Wilcoxon: W+ = ${f(w.Wplus, 1)}, W = ${f(w.W, 1)}, Z = ${f(w.z)}, p one-tailed ${fp(w.pGreater)}, two-tailed ${fp(w.pTwo)}, r = ${f(w.r)} (${w.n} non-zero pairs, ${w.nZero} ties at zero${w.exact ? ', exact p' : ', normal approx.'})</div>
+    <div class="note">Practical effect: participants accepted ${f(A.h1.extraPer10)} more of the AI's mistakes per 10 emails under Pre-select
+      (side-with-AI rate on wrong emails: Suggest ${f(A.h1.acceptRate.sug * 100, 0)}%, Pre-select ${f(A.h1.acceptRate.pre * 100, 0)}%).
+      Report the test chosen by Shapiro–Wilk as the confirmatory result; the other is a robustness check.</div>
+  </div>`;
+}
+
+function h2Panel(A) {
+  const h = A.h2, w = h.w, sig = w.pLess < 0.05;
+  const desc = v => `median ${f(St.median(v), 1)}, IQR ${f(St.quantile(v, .25), 1)}–${f(St.quantile(v, .75), 1)}`;
+  return `<div class="panel">
+    <h2>H2 · Sense of agency (2–14, secondary)</h2>
+    <div class="verdict ${sig ? 'good' : 'warn'}">${sig ? 'Agency was significantly lower after Pre-select' : 'No significant drop in agency after Pre-select'}
+      (Suggest ${desc(h.sug)}; Pre-select ${desc(h.pre)}).</div>
+    <div class="grid2">
+      <div><h3>Mean agency per condition (whiskers = 1 SD)</h3>${barChart([
+        { key: 'suggest', label: 'Suggest', vals: h.sug }, { key: 'preselect', label: 'Pre-select', vals: h.pre }], 2, 14, 'agency')}</div>
+      <div><h3>Test</h3><div class="statline">Wilcoxon signed-rank (Pre-select − Suggest):
+W+ = ${f(w.Wplus, 1)}, W = ${f(w.W, 1)}, Z = ${f(w.z)}
+p one-tailed (lower) ${fp(w.pLess)}, two-tailed ${fp(w.pTwo)}, r = ${f(w.r)}
+${w.n} non-zero pairs, ${w.nZero} ties at zero${w.exact ? ', exact p' : ', normal approx.'}</div>
+      <div class="note">Secondary: report alongside H1; no conclusion rests on it alone.</div></div>
+    </div></div>`;
+}
+
+function exPanel(A) {
+  const e = A.ex, row = (name, r) => r ? `<tr><td>${name}</td><td class="num">${f(r.F, 2)}</td><td class="num">1, ${r.df2}</td><td class="num">${fp(r.p)}</td><td class="num">${f(r.eta, 3)}</td></tr>`
+    : `<tr><td>${name}</td><td colspan="4" class="num">no variance</td></tr>`;
+  return `<div class="panel">
+    <h2>Exploratory · initiative × AI correctness</h2>
+    <p class="note" style="margin-top:0">2 × 2 repeated-measures ANOVA on agreement with the AI. A significant interaction means the default effect differs between AI-wrong and AI-right emails.</p>
+    ${interactionPlot(e.cells)}
+    <table><tr><th>Effect</th><th class="num">F</th><th class="num">df</th><th class="num">p</th><th class="num">partial η²</th></tr>
+      ${row('AI initiative', e.initiative)}${row('AI correctness', e.correctness)}${row('Initiative × correctness', e.interaction)}</table>
+  </div>`;
+}
+
+function orderPanel(A) {
+  if (!A.order) return `<div class="panel"><h2>Order effects</h2><p class="empty">Needs at least 2 participants in each order.</p></div>`;
+  const o = A.order, r1 = A.round1, row = (name, r) => `<tr><td>${name}</td><td class="num">${f(r.F, 2)}</td><td class="num">1, ${r.df2}</td><td class="num">${fp(r.p)}</td><td class="num">${f(r.eta, 3)}</td></tr>`;
+  return `<div class="panel">
+    <h2>Order effects · condition × order</h2>
+    <p class="note" style="margin-top:0">2 × 2 mixed ANOVA on H1 agreement (condition within, order between). Suggest first n = ${o.n1}, Pre-select first n = ${o.n2}.</p>
+    <table><tr><th>Effect</th><th class="num">F</th><th class="num">df</th><th class="num">p</th><th class="num">partial η²</th></tr>
+      ${row('Condition', o.condition)}${row('Order', o.order)}${row('Condition × order', o.interaction)}</table>
+    <h3>Round-1-only fallback (between subjects)</h3>
+    <div class="statline">Pre-select (n=${r1.n1}) M = ${f(r1.m1, 1)} vs Suggest (n=${r1.n2}) M = ${f(r1.m2, 1)}
+Welch t(${f(r1.df, 1)}) = ${f(r1.t, 3)}, p one-tailed ${fp(r1.pGreater)}, two-tailed ${fp(r1.pTwo)}</div>
+    <div class="note">Use the fallback only if the condition × order interaction is significant (carry-over between rounds).</div>
+  </div>`;
+}
+
+function checksPanel(A) {
+  const c = A.checks;
+  return `<div class="panel"><h2>Checks</h2>
+    <div class="tiles">
+      ${tile('Manipulation check passed', `${c.manipulationPass}/${A.n}`, 'named the Pre-select round correctly')}
+      ${tile('Default changed (Pre-select)', `${f(c.changedRate * 100, 0)}%`, 'of emails where the pre-selected answer was changed')}
+      ${tile('AI seemed real', c.credibility.map(([k, v]) => `${v}`).join(' / '), 'Yes / Unsure / No')}
+      ${tile('Median time per email', `${f(c.medianMs.suggest / 1000, 1)} s / ${f(c.medianMs.preselect / 1000, 1)} s`, 'Suggest / Pre-select')}
+      ${tile('Correct (of 10)', `${f(c.accuracy.suggest, 1)} / ${f(c.accuracy.preselect, 1)}`, 'Suggest / Pre-select')}
+    </div></div>`;
+}
+
+function participantsPanel(people) {
+  return `<div class="panel"><div class="controls"><h2 style="flex:1">Participants</h2>
+      <button id="dlSummary">Download per-participant CSV</button><button id="dlRows">Download cleaned rows CSV</button></div>
+    <div class="scroll"><table>
+      <tr><th>Code</th><th>Mode</th><th class="num">Ver.</th><th>Order</th><th class="num">Agree-wrong S</th><th class="num">Agree-wrong P</th>
+        <th class="num">Diff</th><th class="num">Agency S</th><th class="num">Agency P</th><th class="num">Median s S/P</th><th class="num">Changed P</th><th>Manip.</th><th>Status</th></tr>
+      ${people.map(p => { const s = p.cond.suggest, q = p.cond.preselect; return `<tr>
+        <td>${esc(p.id)}</td><td>${esc(p.mode)}</td><td class="num">${p.version}</td><td>${p.order}</td>
+        <td class="num">${f(s.agreeWrong, 1)}</td><td class="num">${f(q.agreeWrong, 1)}</td><td class="num">${f(q.agreeWrong - s.agreeWrong, 1)}</td>
+        <td class="num">${f(s.agency, 0)}</td><td class="num">${f(q.agency, 0)}</td>
+        <td class="num">${f(s.medianMs / 1000, 1)} / ${f(q.medianMs / 1000, 1)}</td><td class="num">${f(q.changedRate * 100, 0)}%</td>
+        <td>${esc(p.manipulation)}</td>
+        <td>${p.included ? '<span class="okflag">included</span>' : p.flags.map(x => `<span class="flag">${x}</span>`).join('')}</td></tr>`; }).join('')}
+    </table></div></div>`;
+}
+
+function emailsPanel(rows, people) {
+  const inc = new Set(people.filter(p => p.included).map(p => p.id));
+  const em = rows.filter(r => r.item_type === 'email' && inc.has(r.participant));
+  const ids = [...new Set(em.map(r => r.item_id))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  if (!ids.length) return '';
+  const cellFor = (id, c) => { const e = em.filter(r => r.item_id === id && r.condition === c);
+    return e.length ? `${f(St.mean(e.map(r => num(r.final))), 0)} <span style="color:var(--text-muted)">(${e.length})</span>` : '–'; };
+  return `<div class="panel"><details><summary><b>Per-email ratings</b> (included participants)</summary>
+    <div class="scroll"><table><tr><th>Email</th><th>Truth</th><th>AI said</th><th>AI</th><th class="num">Mean rating · Suggest (n)</th><th class="num">Mean rating · Pre-select (n)</th><th class="num">% correct</th></tr>
+    ${ids.map(id => { const e = em.filter(r => r.item_id === id), r0 = e[0];
+      const corr = e.filter(r => side(num(r.final)) === (r0.truth === 'phishing' ? 'phish' : 'safe')).length / e.length;
+      return `<tr><td>${id}</td><td>${r0.truth}</td><td>${LABEL[num(r0.ai_rating)]}</td><td>${num(r0.ai_correct) ? '✓' : '<b>wrong</b>'}</td>
+        <td class="num">${cellFor(id, 'suggest')}</td><td class="num">${cellFor(id, 'preselect')}</td><td class="num">${f(corr * 100, 0)}%</td></tr>`; }).join('')}
+    </table></div></details></div>`;
+}
+
+/* ---------- Charts (plain SVG) ---------- */
+function barChart(series, lo, hi, unit) {
+  const W = 420, H = 240, m = { l: 40, r: 16, t: 24, b: 30 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const y = v => m.t + ih - (v - lo) / (hi - lo) * ih;
+  const ticks = unit === 'agency' ? [2, 5, 8, 11, 14] : [0, 25, 50, 75, 100];
+  const bw = 56, gap = iw / series.length;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Bar chart of mean ${unit} by condition">`;
+  ticks.forEach(t => s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)"/><text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${t}</text>`);
+  series.forEach((se, i) => {
+    const cx = m.l + gap * (i + 0.5), mu = St.mean(se.vals), sd = St.sd(se.vals);
+    const top = y(mu), base = y(lo), col = `var(--series-${se.key === 'suggest' ? 1 : 2})`;
+    s += `<path d="M${cx - bw / 2},${base} V${top + 4} q0,-4 4,-4 H${cx + bw / 2 - 4} q4,0 4,4 V${base} Z" fill="${col}"
+      data-tip="${se.label}: mean ${f(mu, 1)}, SD ${f(sd, 1)}, n ${se.vals.length}"/>`;
+    const a = y(Math.min(hi, mu + sd)), b = y(Math.max(lo, mu - sd));
+    s += `<g stroke="var(--text-secondary)" stroke-width="1.5"><line x1="${cx}" x2="${cx}" y1="${a}" y2="${b}"/>
+      <line x1="${cx - 8}" x2="${cx + 8}" y1="${a}" y2="${a}"/><line x1="${cx - 8}" x2="${cx + 8}" y1="${b}" y2="${b}"/></g>`;
+    s += `<text class="val" x="${cx + bw / 2 + 6}" y="${top + 4}">${f(mu, 1)}</text>`;
+    s += `<text x="${cx}" y="${H - 10}" text-anchor="middle" style="fill:var(--text-primary);font-size:12px">${se.label}</text>`;
+  });
+  return s + `<line x1="${m.l}" x2="${W - m.r}" y1="${y(lo)}" y2="${y(lo)}" stroke="var(--text-muted)"/></svg>`;
+}
+
+function pairedPlot(a, b, lo, hi, A) {
+  const W = 420, H = 240, m = { l: 40, r: 16, t: 24, b: 30 }, ih = H - m.t - m.b;
+  const y = v => m.t + ih - (v - lo) / (hi - lo) * ih, x1 = m.l + 90, x2 = W - m.r - 90;
+  const ids = DATA.people.filter(p => p.included).map(p => p.id);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Paired dot plot of agreement per participant">`;
+  [0, 25, 50, 75, 100].forEach(t => s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)"/><text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${t}</text>`);
+  // jitter identical pairs slightly so overlapping lines stay visible
+  const count = {};
+  a.forEach((v, i) => {
+    const k = `${v}|${b[i]}`, j = ((count[k] = (count[k] || 0) + 1) - 1) * 3;
+    const tip = `${ids[i]}: Suggest ${f(v, 1)} → Pre-select ${f(b[i], 1)}`;
+    s += `<line x1="${x1}" x2="${x2}" y1="${y(v) + j}" y2="${y(b[i]) + j}" stroke="var(--neutral-mark)" stroke-width="1.5" data-tip="${tip}"/>
+      <circle cx="${x1}" cy="${y(v) + j}" r="5" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="2" data-tip="${tip}"/>
+      <circle cx="${x2}" cy="${y(b[i]) + j}" r="5" fill="var(--series-2)" stroke="var(--surface-1)" stroke-width="2" data-tip="${tip}"/>`;
+  });
+  s += `<text x="${x1}" y="${H - 10}" text-anchor="middle" style="fill:var(--text-primary);font-size:12px">Suggest</text>
+    <text x="${x2}" y="${H - 10}" text-anchor="middle" style="fill:var(--text-primary);font-size:12px">Pre-select</text>`;
+  return s + `</svg>`;
+}
+
+function interactionPlot(cells) {
+  const W = 420, H = 220, m = { l: 40, r: 90, t: 16, b: 30 }, ih = H - m.t - m.b;
+  const y = v => m.t + ih - v / 100 * ih, xs = [m.l + 60, W - m.r - 40];
+  let s = `<div class="legend"><span><i style="background:var(--series-1)"></i>Suggest</span><span><i style="background:var(--series-2)"></i>Pre-select</span></div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Interaction plot: mean agreement by AI correctness and condition">`;
+  [0, 25, 50, 75, 100].forEach(t => s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)"/><text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${t}</text>`);
+  // end labels: keep at least 14px apart so they never collide
+  let ly = [y(cells.suggest.right), y(cells.preselect.right)];
+  if (Math.abs(ly[0] - ly[1]) < 14) { const mid = (ly[0] + ly[1]) / 2, up = cells.suggest.right >= cells.preselect.right ? 0 : 1;
+    ly[up] = mid - 7; ly[1 - up] = mid + 7; }
+  ['suggest', 'preselect'].forEach((c, i) => {
+    const v = [cells[c].wrong, cells[c].right], col = `var(--series-${i + 1})`;
+    s += `<line x1="${xs[0]}" x2="${xs[1]}" y1="${y(v[0])}" y2="${y(v[1])}" stroke="${col}" stroke-width="2"/>`;
+    v.forEach((vv, k) => s += `<circle cx="${xs[k]}" cy="${y(vv)}" r="5" fill="${col}" stroke="var(--surface-1)" stroke-width="2" data-tip="${CNAME[c]}, AI ${k ? 'right' : 'wrong'}: mean agreement ${f(vv, 1)}"/>`);
+    s += `<text x="${xs[1] + 10}" y="${ly[i] + 4}" style="fill:var(--text-primary)">${CNAME[c]} ${f(v[1], 0)}</text>`;
+  });
+  s += `<text x="${xs[0]}" y="${H - 10}" text-anchor="middle" style="fill:var(--text-primary);font-size:12px">AI wrong</text>
+    <text x="${xs[1]}" y="${H - 10}" text-anchor="middle" style="fill:var(--text-primary);font-size:12px">AI right</text>`;
+  return s + `</svg>`;
+}
+
+function bindTips() {
+  const tip = $('tip');
+  document.querySelectorAll('[data-tip]').forEach(el => {
+    el.addEventListener('mousemove', e => { tip.style.display = 'block'; tip.textContent = el.dataset.tip;
+      tip.style.left = e.clientX + 12 + 'px'; tip.style.top = e.clientY + 12 + 'px'; });
+    el.addEventListener('mouseleave', () => tip.style.display = 'none');
+  });
+}
+
+/* ---------- Exports ---------- */
+const toCsv = (head, rows) => [head.join(',')].concat(rows.map(r => r.map(v => {
+  const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(','))).join('\n');
+function download(name, text) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' })); a.download = name; a.click();
+}
+function downloadSummary(people) {
+  const head = ['participant', 'mode', 'version', 'attempt', 'order', 'included', 'flags',
+    'agree_wrong_suggest', 'agree_wrong_preselect', 'diff_agree_wrong', 'agree_right_suggest', 'agree_right_preselect',
+    'accepted_wrong_suggest', 'accepted_wrong_preselect', 'agency_suggest', 'agency_preselect',
+    'median_ms_suggest', 'median_ms_preselect', 'correct_suggest', 'correct_preselect', 'changed_rate_preselect',
+    'attention_suggest', 'attention_preselect', 'manipulation', 'credibility'];
+  download('participant_summary.csv', toCsv(head, people.map(p => { const s = p.cond.suggest, q = p.cond.preselect; return [
+    p.id, p.mode, p.version, p.attempt, p.order, p.included ? 1 : 0, p.flags.join('; '),
+    s.agreeWrong, q.agreeWrong, q.agreeWrong - s.agreeWrong, s.agreeRight, q.agreeRight, s.acceptedWrong, q.acceptedWrong,
+    s.agency, q.agency, s.medianMs, q.medianMs, s.accuracy, q.accuracy, q.changedRate, s.attention, q.attention, p.manipulation, p.credibility]; })));
+}
+const COLS = ['row_id', 'client_time', 'participant', 'attempt', 'version', 'mode', 'round', 'condition', 'email_set', 'item_type',
+  'item_id', 'position', 'truth', 'ai_rating', 'ai_correct', 'start', 'final', 'changed', 'ms', 'status'];
+function downloadRows(rows) { download('responses_clean.csv', toCsv(COLS, rows.map(r => COLS.map(c => r[c])))); }
+
+/* =====================================================================
+   LOADING DATA
+   ===================================================================== */
+function parseCsv(text) {
+  const out = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') q = false; else cell += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); out.push(row); row = []; cell = ''; }
+    else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); out.push(row); }
+  const head = out.shift().map(h => h.trim());
+  return out.filter(r => r.length > 1).map(r => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ''])));
+}
+function setData(rows, source) {
+  DATA.rawRows = rows;
+  $('msg').textContent = `Loaded ${rows.length} rows from ${source} at ${new Date().toLocaleTimeString()}.`;
+  render();
+}
+async function loadRemote() {
+  const url = $('url').value.trim(), key = $('key').value;
+  if (!url) { $('msg').textContent = 'Paste the Apps Script web-app URL first.'; return; }
+  try { localStorage.setItem('g7_dash', JSON.stringify({ url, key })); } catch {}
+  $('msg').textContent = 'Loading…';
+  try {
+    const res = await fetch(`${url}?action=data&key=${encodeURIComponent(key)}`);
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error);
+    setData(j.rows, 'Google Sheet');
+  } catch (e) { $('msg').textContent = 'Could not load: ' + e.message; }
+}
+
+// Simulated data, generated exactly the way the app logs it (for testing the pipeline).
+function simulate(n = 16, seed = 7) {
+  let s = seed; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const norm = () => Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(2 * Math.PI * rnd());
+  const PLAN = [[0, 'legit'], [100, 'phishing'], [0, 'phishing'], [33, 'legit'], [67, 'phishing'], [67, 'legit'], [0, 'legit'], [33, 'phishing'], [0, 'legit'], [100, 'phishing']];
+  const V = { 1: [['suggest', 'A'], ['preselect', 'B']], 2: [['preselect', 'A'], ['suggest', 'B']], 3: [['suggest', 'B'], ['preselect', 'A']], 4: [['preselect', 'B'], ['suggest', 'A']] };
+  const rows = []; let t = Date.parse('2026-11-13T10:00:00Z');
+  for (let i = 0; i < n + 2; i++) {
+    const pid = 'S' + String(i + 1).padStart(3, '0'), version = (i % 4) + 1, skill = norm();
+    const attempt = i === n ? 2 : 1, fast = i === n + 1;   // one repeat, one speeder
+    const base = { participant: pid, attempt, version, mode: 'demo' }; let seq = 0;
+    const push = o => rows.push({ ...base, row_id: `${pid}-${++seq}`, client_time: new Date(t += 4000).toISOString(),
+      round: '', condition: '', email_set: '', position: '', truth: '', ai_rating: '', ai_correct: '', start: '', changed: '', status: 'ok', ...o });
+    V[version].forEach(([cond, set], r) => {
+      PLAN.forEach(([ai, truth], k) => {
+        const aiCorrect = truth === 'phishing' ? ai >= 67 : ai <= 33;
+        const pFollow = aiCorrect ? 0.88 : (cond === 'preselect' ? 0.55 : 0.32) - 0.08 * skill;
+        let final;
+        if (rnd() < pFollow) final = ai; else final = truth === 'phishing' ? (rnd() < 0.5 ? 100 : 67) : (rnd() < 0.5 ? 0 : 33);
+        if (rnd() < 0.15) {   // occasional one-step wobble on the scale
+          const SC = [0, 33, 67, 100], k2 = SC.indexOf(final) + (rnd() < 0.5 ? -1 : 1);
+          final = SC[Math.max(0, Math.min(3, k2))];
+        }
+        const ms = fast ? 900 + rnd() * 600 : Math.round(Math.exp(8.6 + 0.35 * norm()) * (cond === 'preselect' ? 0.9 : 1));
+        push({ round: r + 1, condition: cond, email_set: set, item_type: 'email', item_id: set + (k + 1), position: k + 1, truth,
+          ai_rating: ai, ai_correct: aiCorrect ? 1 : 0, start: cond === 'preselect' ? ai : '', final,
+          changed: cond === 'preselect' ? (final !== ai ? 1 : 0) : '', ms });
+      });
+      push({ round: r + 1, condition: cond, email_set: set, item_type: 'attention', item_id: `attention_${r + 1}`, final: r ? 100 : 33, status: rnd() < 0.96 ? 'pass' : 'fail' });
+      const ag = Math.round(Math.max(2, Math.min(14, (cond === 'preselect' ? 9.6 : 10.8) + 2 * norm())));
+      const a1 = Math.min(7, Math.max(1, Math.ceil(ag / 2))), a2 = Math.min(7, Math.max(1, ag - a1));
+      push({ round: r + 1, condition: cond, email_set: set, item_type: 'agency', item_id: 'agency_control', final: a1 });
+      push({ round: r + 1, condition: cond, email_set: set, item_type: 'agency', item_id: 'agency_own', final: a2 });
+    });
+    push({ item_type: 'manipulation', item_id: 'manipulation', final: 'Round 1', status: rnd() < 0.8 ? 'pass' : 'fail' });
+    push({ item_type: 'credibility', item_id: 'credibility', final: ['Yes', 'Unsure', 'No'][Math.floor(rnd() * 3)] });
+    push({ item_type: 'complete', item_id: 'complete', final: 15, status: 'complete' });
+  }
+  return rows;
+}
+
+/* ---------- Wire up ---------- */
+try { const s = JSON.parse(localStorage.getItem('g7_dash') || '{}'); if (s.url) $('url').value = s.url; if (s.key) $('key').value = s.key; } catch {}
+$('load').onclick = loadRemote;
+$('file').onchange = async e => { const file = e.target.files[0]; if (file) setData(parseCsv(await file.text()), file.name); };
+$('local').onclick = () => { let rows = []; try { rows = JSON.parse(localStorage.getItem('hcai_g7_backup_rows') || '[]'); } catch {}
+  if (!rows.length) { $('msg').textContent = 'No demo data in this browser yet. Open index.html (demo mode) in this browser and complete a session first.'; return; }
+  setData(rows, 'this browser'); };
+$('sim').onclick = () => setData(simulate(16), 'the simulator (16 participants + 1 repeat + 1 speeder)');
+document.querySelectorAll('.mode').forEach(x => x.onchange = render);
+let timer = null;
+$('auto').onchange = e => { clearInterval(timer); if (e.target.checked) { loadRemote(); timer = setInterval(loadRemote, 20000); } };
+window.St = St; window.summarise = summarise; window.analyse = analyse; window.simulate = simulate; window.parseCsv = parseCsv;   // for testing
+</script>
+</body>
+</html>

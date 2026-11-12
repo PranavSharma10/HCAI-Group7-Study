@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Mailbox · Email triage study</title>
+<style>
+/* ------------------------------------------------------------------
+   Look & feel: a generic webmail client (light grey canvas, white
+   cards, pill search bar, round avatars). Phone-first; a sidebar
+   appears on wide screens.
+------------------------------------------------------------------- */
+:root {
+  --bg: #f6f8fc;
+  --surface: #ffffff;
+  --text: #1f1f1f;
+  --text-2: #444746;
+  --text-3: #5f6368;
+  --line: #e3e7ee;
+  --accent: #0b57d0;
+  --accent-soft: #d3e3fd;
+  --select: #c2e7ff;
+  --chip: #e9eef6;
+  --danger: #b3261e;
+  --ok: #146c2e;
+  --assist: #f3effa;
+  --assist-line: #ddd3f0;
+  --radius: 16px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); }
+body { min-height: 100vh; -webkit-text-size-adjust: 100%; }
+button { font: inherit; color: inherit; }
+.layout { display: flex; min-height: 100vh; }
+
+/* Sidebar (wide screens only) */
+.sidebar { display: none; width: 240px; padding: 12px 12px 12px 8px; flex-shrink: 0; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 10px 14px 18px; font-size: 21px; color: var(--text-2); }
+.compose { display: inline-flex; align-items: center; gap: 12px; background: var(--accent-soft); border: 0;
+  border-radius: 16px; padding: 18px 22px; font-weight: 500; margin-bottom: 14px; cursor: default; }
+.nav-item { display: flex; justify-content: space-between; padding: 7px 14px 7px 24px; border-radius: 0 20px 20px 0;
+  font-size: 14px; color: var(--text-2); }
+.nav-item.active { background: var(--accent-soft); color: #041e49; font-weight: 600; }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; position: sticky; top: 0; z-index: 5; background: var(--bg); }
+.search { flex: 1; display: flex; align-items: center; gap: 10px; background: #eaf1fb; border-radius: 28px;
+  padding: 11px 16px; color: var(--text-3); font-size: 15px; min-width: 0; }
+.search span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me { width: 34px; height: 34px; border-radius: 50%; background: #7b5ea7; color: #fff; display: grid; place-items: center;
+  font-size: 15px; font-weight: 600; flex-shrink: 0; }
+.progress-pill { font-size: 12px; font-weight: 600; color: var(--text-2); background: var(--chip); border-radius: 12px;
+  padding: 4px 10px; white-space: nowrap; }
+.icon { width: 24px; height: 24px; fill: currentColor; flex-shrink: 0; }
+.icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; color: var(--text-2); border: 0; background: none; }
+.icon-btn[aria-disabled="true"] { opacity: .35; }
+
+.pane { background: var(--surface); flex: 1; border-radius: var(--radius) var(--radius) 0 0; overflow: hidden; display: flex; flex-direction: column; }
+.content { padding: 16px 18px 24px; flex: 1; }
+.content.narrow { max-width: 680px; width: 100%; margin: 0 auto; }
+
+h1 { font-size: 22px; font-weight: 400; line-height: 1.3; margin: 4px 0 14px; }
+h2 { font-size: 18px; font-weight: 500; margin: 18px 0 8px; }
+p, li { line-height: 1.5; font-size: 15px; }
+.muted { color: var(--text-3); }
+.small { font-size: 13px; }
+
+/* Email list (inbox) */
+.list-head { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 18px 2px; font-size: 13px; color: var(--text-3); }
+.mail-row { display: flex; gap: 14px; padding: 12px 18px; border-bottom: 1px solid #f0f2f6; }
+.mail-row .meta { min-width: 0; flex: 1; }
+.mail-row .line1 { display: flex; justify-content: space-between; gap: 8px; }
+.mail-row .from, .mail-row .subj { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
+.mail-row .time { font-size: 12px; font-weight: 700; color: var(--text); flex-shrink: 0; }
+.mail-row .snippet { color: var(--text-3); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 17px; flex-shrink: 0; }
+
+/* Email reading view */
+.subject-row { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.chip { font-size: 12px; background: var(--chip); color: var(--text-2); padding: 3px 8px; border-radius: 6px; margin-top: 10px; }
+.sender { display: flex; gap: 12px; align-items: flex-start; margin: 4px 0 18px; }
+.sender .who { flex: 1; min-width: 0; }
+.sender .name { font-weight: 600; font-size: 15px; }
+.sender .addr { font-size: 13px; color: var(--text-3); word-break: break-all; }
+.sender .to { font-size: 13px; color: var(--text-3); }
+.sender .time { font-size: 12px; color: var(--text-3); white-space: nowrap; }
+.body { font-size: 15px; line-height: 1.55; }
+.body p { margin: 0 0 12px; }
+.mlink { color: var(--accent); text-decoration: underline; font-weight: 500; }
+.mbtn { display: inline-block; background: var(--accent); color: #fff; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 14px; }
+.murl { display: block; font-size: 12px; color: var(--text-3); margin: 4px 0 12px; word-break: break-all; }
+.sig { color: var(--text-3); font-size: 13px; margin-top: 18px; }
+
+/* Assistant + rating dock */
+.dock { position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--line);
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 14px rgba(32,33,36,.06); }
+.dock-inner { max-width: 680px; margin: 0 auto; }
+.assist { background: var(--assist); border: 1px solid var(--assist-line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.assist-head { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #5b3e96; text-transform: uppercase; letter-spacing: .04em; }
+.verdict { font-size: 16px; margin: 4px 0 6px; }
+.risk { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); }
+.riskbar { flex: 1; height: 6px; background: #e6e1ef; border-radius: 3px; overflow: hidden; max-width: 220px; }
+.riskbar > i { display: block; height: 100%; background: #7b5ea7; border-radius: 3px; }
+.rate-label { font-size: 13px; font-weight: 600; color: var(--text-2); margin: 0 0 6px; }
+.scale { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+@media (min-width: 560px) { .scale { grid-template-columns: repeat(4, 1fr); } }
+.opt { border: 1px solid #c4c7c5; background: var(--surface); border-radius: 10px; padding: 12px 6px; font-size: 15px;
+  text-align: center; cursor: pointer; min-height: 48px; touch-action: manipulation; }
+.opt[aria-pressed="true"] { background: var(--select); border-color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent); }
+.primary { width: 100%; border: 0; border-radius: 24px; background: var(--accent); color: #fff; font-weight: 600; font-size: 16px;
+  padding: 14px; cursor: pointer; min-height: 50px; touch-action: manipulation; }
+.primary:disabled { background: #c9ccd1; color: #f3f4f6; cursor: not-allowed; }
+.secondary { border: 1px solid #c4c7c5; background: var(--surface); border-radius: 24px; padding: 11px 18px; font-weight: 500; cursor: pointer; }
+
+/* Forms & questionnaire */
+label.field { display: block; margin: 14px 0; font-size: 14px; color: var(--text-2); font-weight: 500; }
+label.field input { display: block; width: 100%; margin-top: 6px; padding: 13px 14px; font-size: 16px; border: 1px solid #c4c7c5; border-radius: 8px; }
+label.field input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.check { display: flex; gap: 10px; align-items: flex-start; margin: 16px 0; font-size: 15px; line-height: 1.45; }
+.check input { width: 22px; height: 22px; margin-top: 1px; flex-shrink: 0; }
+.card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 12px 0; background: #fbfcfe; }
+.likert { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 8px; }
+.likert .opt { padding: 12px 0; min-height: 46px; }
+.anchors { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); margin-top: 4px; }
+.choice-list { display: grid; gap: 8px; margin-top: 8px; }
+.choice-list .opt { text-align: left; padding: 13px 14px; }
+.scale-key { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 14px; margin: 10px 0; }
+.scale-key b { white-space: nowrap; }
+.error { color: var(--danger); font-size: 14px; margin: 8px 0; }
+.notice { background: #fff8e1; border: 1px solid #f5d77a; border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 10px 0; }
+.status { font-size: 14px; margin: 12px 0; padding: 10px 12px; border-radius: 10px; background: var(--chip); }
+.status.ok { background: #e6f4ea; color: var(--ok); }
+.score { font-size: 40px; font-weight: 300; margin: 6px 0; }
+.wrong-list { padding-left: 18px; }
+.wrong-list li { margin-bottom: 8px; font-size: 14px; }
+.mode-banner { background: #fce8e6; color: #8c1d18; font-size: 12px; text-align: center; padding: 4px; font-weight: 600; }
+
+@media (min-width: 900px) {
+  .sidebar { display: block; }
+  .pane { border-radius: var(--radius); margin: 0 16px 16px 0; }
+  .topbar { padding: 8px 16px 8px 0; }
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ==================================================================
+   1. CONFIGURATION — the only part you normally need to edit
+   ================================================================== */
+const CONFIG = {
+  // Paste the Google Apps Script "Web app" URL here (see README).
+  // Leave empty for DEMO MODE: nothing is sent anywhere, data stays in
+  // this browser and can be downloaded as CSV at the end.
+  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyI9ZFdBVsB2tGKJlD_CVHeFLwYdlRjd9yB3ibYFm-rKLA_O6jfbOnmy15PXpucoP0n/exec',
+
+  // Ask for name + student ID on the first screen?
+  // Names/IDs go ONLY to the "Participants" tab; the "Responses" tab
+  // (what the dashboard reads) only ever sees a code such as P007.
+  COLLECT_IDENTITY: true,
+
+  STUDY_NAME: 'Email triage study',
+  TEAM: 'Group 7, COMP41740 Human-Centred AI',
+};
+
+/* URL options (handy for testing):
+   ?pilot=1   mark this session as a pilot (dashboard ignores it by default)
+   ?v=1..4    force a counterbalancing version
+   ?reset=1   wipe a half-finished session on this device               */
+const params = new URLSearchParams(location.search);
+const MODE = !CONFIG.SCRIPT_URL ? 'demo' : (params.get('pilot') ? 'pilot' : 'live');
+
+/* ==================================================================
+   2. STUDY DESIGN — stimuli, AI verdicts, counterbalancing
+   ================================================================== */
+const SCALE = [
+  { v: 0,   label: 'Safe' },
+  { v: 33,  label: 'Probably safe' },
+  { v: 67,  label: 'Probably phishing' },
+  { v: 100, label: 'Phishing' },
+];
+const LABEL = Object.fromEntries(SCALE.map(s => [s.v, s.label]));
+
+// The scripted assistant. Same verdict + risk score at each position in
+// both sets. Positions 3, 6 and 8 are the AI's mistakes:
+//   3 = phishing rated Safe, 6 = legitimate rated Probably phishing,
+//   8 = phishing rated Probably safe.  7/10 correct = 70%.
+const AI_PLAN = [
+  { ai: 0,   risk: 6  },  // 1  legit     ✓
+  { ai: 100, risk: 94 },  // 2  phishing  ✓
+  { ai: 0,   risk: 9  },  // 3  phishing  ✗
+  { ai: 33,  risk: 28 },  // 4  legit     ✓
+  { ai: 67,  risk: 71 },  // 5  phishing  ✓
+  { ai: 67,  risk: 74 },  // 6  legit     ✗
+  { ai: 0,   risk: 11 },  // 7  legit     ✓
+  { ai: 33,  risk: 24 },  // 8  phishing  ✗
+  { ai: 0,   risk: 8  },  // 9  legit     ✓
+  { ai: 100, risk: 91 },  // 10 phishing  ✓
+];
+
+// Helpers to write email bodies. Links are never live: we show the
+// link text plus where it would go (the destination is often the cue).
+const L = (text, url) => `<span class="mlink">${text}</span><span class="murl">↳ links to ${url}</span>`;
+const B = (text, url) => `<span class="mbtn">${text}</span><span class="murl">↳ links to ${url}</span>`;
+
+// All organisations are fictional. "Dunmore University" is the participant's
+// (fictional) university; legitimate university mail comes from @dunmore-uni.ie.
+const EMAILS = {
+  A: [
+    { truth: 'legit', fromName: 'Dunmore Library', fromAddr: 'noreply@library.dunmore-uni.ie', time: '08:12',
+      subject: 'Reminder: 1 item due back on 14 November',
+      body: `<p>Hi,</p><p><i>Designing Interactive Systems</i> (2nd ed.) is due back on Friday 14 November.</p><p>You can renew it from <b>My Account</b> in the library catalogue, or return it to any Dunmore library desk.</p>`,
+      sig: 'Dunmore University Library', cue: '' },
+    { truth: 'phishing', fromName: 'Kestrel Bank Security', fromAddr: 'security@kestrel-bank-alerts.info', time: '08:47',
+      subject: 'Unusual sign-in detected – verify within 24 hours',
+      body: `<p>Dear customer,</p><p>We detected a sign-in to your account from a new device in Lagos. If you do not verify your identity within <b>24 hours</b>, online banking will be suspended.</p>${B('Verify my account', 'http://kestrel-verify-login.info/secure')}`,
+      sig: 'Kestrel Bank Fraud Team', cue: '' },
+    { truth: 'phishing', fromName: 'ParcelHop Delivery', fromAddr: 'updates@parcelhop-redelivery.co', time: '09:30',
+      subject: 'We missed you – redelivery fee of €1.99 due',
+      body: `<p>Your parcel <b>PH-48810-IE</b> could not be delivered because of an unpaid customs fee.</p><p>Pay <b>€1.99</b> by card today to book a new delivery slot. Unpaid parcels are returned after 48 hours.</p>${B('Pay & reschedule', 'http://parcelhop-fee-pay.co/card')}`,
+      sig: 'ParcelHop Customer Care', cue: 'It asks for card details for a tiny "fee", and the sender and link use odd look-alike domains.' },
+    { truth: 'legit', fromName: 'StudyVault', fromAddr: 'no-reply@studyvault.com', time: '10:05',
+      subject: 'Aoife Byrne shared "Group 7 – pilot plan" with you',
+      body: `<p><b>Aoife Byrne</b> (aoife.byrne@dunmore-uni.ie) shared a document with you.</p><p>"Here's the pilot plan for Thursday – comments welcome!"</p>${B('Open', 'https://studyvault.com/d/7Gk2pPlan')}`,
+      sig: 'StudyVault · You received this because someone shared a file with you.', cue: '' },
+    { truth: 'phishing', fromName: 'IT Service Desk', fromAddr: 'it-support@dunmore-uni-helpdesk.com', time: '10:42',
+      subject: 'Mailbox storage 98% full – action required',
+      body: `<p>Your university mailbox has reached 98% of its quota. New messages will be <b>rejected</b> from tomorrow.</p><p>Sign in below with your university username and password to upgrade your storage for free.</p>${B('Upgrade storage', 'http://dunmore-mailbox-upgrade.com/login')}`,
+      sig: 'IT Services', cue: '' },
+    { truth: 'legit', fromName: 'Streamly', fromAddr: 'billing@streamly.com', time: '11:20',
+      subject: 'Your payment didn’t go through',
+      body: `<p>Hi there,</p><p>We couldn't take this month's payment of €9.99. Your plan stays active for 7 more days.</p><p>To update your payment method, open the <b>Streamly app</b> and go to <b>Account → Billing</b>. We will never ask for your card details by email.</p>`,
+      sig: 'The Streamly team', cue: 'It has no link and tells you to use the official app; it comes from the company’s own domain.' },
+    { truth: 'legit', fromName: "Dunmore Students' Union", fromAddr: 'events@su.dunmore-uni.ie', time: '12:02',
+      subject: 'This week: table quiz and the careers fair',
+      body: `<p>Table quiz in the SU bar on <b>Wednesday at 19:00</b> – teams of four, €2 per person at the door.</p><p>The careers fair runs Thursday 10:00–16:00 in the main hall. Bring a CV!</p>`,
+      sig: "Dunmore Students' Union", cue: '' },
+    { truth: 'phishing', fromName: 'CloudNest Team', fromAddr: 'support@c1oudnest.com', time: '13:15',
+      subject: 'Final notice: your files will be deleted',
+      body: `<p>Your CloudNest storage plan has expired. All your photos and files will be <b>permanently deleted</b> in 12 hours.</p><p>Confirm your account and payment details to keep them.</p>${B('Keep my files', 'http://c1oudnest.com/account/confirm')}`,
+      sig: 'CloudNest', cue: 'The sender is “c1oudnest” (a digit 1 instead of an “l”), and it threatens deletion within hours.' },
+    { truth: 'legit', fromName: 'TrailRail', fromAddr: 'tickets@trailrail.ie', time: '14:40',
+      subject: 'Your e-ticket: Dublin Heuston → Galway, Sat 15 Nov',
+      body: `<p>Booking reference <b>TR8Q2LX</b></p><p>Departs 09:35 from Dublin Heuston, arrives 11:58 Galway Ceannt. Seat C14.</p><p>Show the QR code in the TrailRail app when asked.</p>`,
+      sig: 'TrailRail · Have a good journey', cue: '' },
+    { truth: 'phishing', fromName: 'HR Payroll', fromAddr: 'payroll@dunmore-uni.ie.payroll-update.net', time: '15:55',
+      subject: 'Update your bank details before payday',
+      body: `<p>Due to a system migration, all staff and student workers must re-enter their bank details by Friday or this month's payment will be delayed.</p>${L('Update payroll details', 'http://payroll-update.net/dunmore/form')}`,
+      sig: 'Payroll Office', cue: '' },
+  ],
+  B: [
+    { truth: 'legit', fromName: 'Dunmore Sports Centre', fromAddr: 'bookings@sport.dunmore-uni.ie', time: '08:05',
+      subject: 'Booking confirmed: badminton court 3, Tue 18:00',
+      body: `<p>Your booking is confirmed.</p><p><b>Badminton – Court 3</b><br>Tuesday 18:00–19:00</p><p>Please bring your student card. To cancel, use the Sports Centre app at least 2 hours before.</p>`,
+      sig: 'Dunmore Sports Centre', cue: '' },
+    { truth: 'phishing', fromName: 'Harbour Energy', fromAddr: 'billing@harbour-energy-refunds.net', time: '08:51',
+      subject: 'You are owed a refund of €84.20',
+      body: `<p>After a review of your account we found you were overcharged. You are entitled to a refund of <b>€84.20</b>.</p><p>Enter your card details within 48 hours to receive the money.</p>${B('Claim refund', 'http://harbour-refund-claim.net/card')}`,
+      sig: 'Harbour Energy Billing', cue: '' },
+    { truth: 'phishing', fromName: 'ParkSmart Dublin', fromAddr: 'noreply@parksmart-fines.info', time: '09:26',
+      subject: 'Unpaid parking charge – €2.50 due today',
+      body: `<p>Our records show an unpaid parking session on 3 November.</p><p>Pay <b>€2.50</b> by card today to avoid a <b>€60 penalty</b>.</p>${B('Pay now', 'http://parksmart-fines.info/pay')}`,
+      sig: 'ParkSmart Enforcement', cue: 'It asks for card details for a tiny charge under threat of a fine, from an odd domain.' },
+    { truth: 'legit', fromName: 'Meetly', fromAddr: 'invites@meetly.com', time: '10:10',
+      subject: 'Invitation: Group 7 pilot run – Thu 15:00',
+      body: `<p><b>Aoife Byrne</b> invited you to an event.</p><p>Group 7 pilot run<br>Thursday 15:00–15:30 · Computer Science, room B1.08</p>${L('Yes · Maybe · No', 'https://meetly.com/rsvp/g7pilot')}`,
+      sig: 'Invitation from Meetly', cue: '' },
+    { truth: 'phishing', fromName: 'Library Services', fromAddr: 'library-services@dunmore-lib-renew.com', time: '10:48',
+      subject: 'Your library account expires today – re-validate now',
+      body: `<p>Your Dunmore library account expires <b>today</b>. Expired accounts lose access to all e-journals and loans.</p><p>Re-validate with your university username and password.</p>${B('Re-validate account', 'http://dunmore-lib-renew.com/signin')}`,
+      sig: 'Library Services', cue: '' },
+    { truth: 'legit', fromName: 'Kestrel Bank', fromAddr: 'alerts@kestrelbank.ie', time: '11:33',
+      subject: 'A new payee was added to your account',
+      body: `<p>A new payee, <b>J. Murphy</b>, was added to your current account at 11:31 today.</p><p>If this was you, no action is needed. If not, call the number on the back of your card. We never include links in security alerts.</p>`,
+      sig: 'Kestrel Bank', cue: 'It has no link, asks for nothing, and tells you to phone the number on your own card; it comes from the bank’s own domain.' },
+    { truth: 'legit', fromName: 'CS Module Coordinator', fromAddr: 'coordinator@cs.dunmore-uni.ie', time: '12:15',
+      subject: 'Week 10 lab moved to room B1.08',
+      body: `<p>Hi all,</p><p>This week's lab is moved to <b>room B1.08</b> (same time). Bring your laptop and phone – you'll be taking part in other groups' studies.</p>`,
+      sig: 'Module coordinator, School of Computer Science', cue: '' },
+    { truth: 'phishing', fromName: 'StudyVault', fromAddr: 'share@studyvau1t.com', time: '13:22',
+      subject: 'Aoife Byrne shared "Final_Report.pdf" with you',
+      body: `<p><b>Aoife Byrne</b> shared a file with you.</p><p>Sign in to view <b>Final_Report.pdf</b>. This link expires in 2 hours.</p>${B('Sign in to view', 'http://studyvau1t-docs.com/login')}`,
+      sig: 'StudyVault', cue: 'The sender is “studyvau1t” (a digit 1 instead of an “l”), and the link goes to a different domain.' },
+    { truth: 'legit', fromName: 'Bean There Café', fromAddr: 'hello@beanthere.ie', time: '14:31',
+      subject: 'One more stamp for a free coffee ☕',
+      body: `<p>You've collected 9 of 10 stamps on your loyalty card. Your next coffee is on us!</p><p>Just show the card in the Bean There app at the till.</p>`,
+      sig: 'Bean There Café', cue: '' },
+    { truth: 'phishing', fromName: 'Scholarships Office', fromAddr: 'awards@dunmore-scholarship-fund.org', time: '15:48',
+      subject: 'Congratulations – you have been selected for a €1,500 bursary',
+      body: `<p>You have been selected for the Dunmore Excellence Bursary of <b>€1,500</b>.</p><p>To receive payment, confirm your bank account and PPS number by Friday.</p>${L('Confirm my details', 'http://dunmore-scholarship-fund.org/claim')}`,
+      sig: 'Scholarships Office', cue: '' },
+  ],
+};
+// Attach position, AI verdict and ids.
+for (const set of ['A', 'B']) {
+  EMAILS[set].forEach((e, i) => {
+    Object.assign(e, AI_PLAN[i], { pos: i + 1, set, id: set + (i + 1) });
+    e.aiCorrect = e.truth === 'phishing' ? e.ai >= 67 : e.ai <= 33;
+    e.preview = e.body.replace(/<[^>]+>/g, ' ').replace(/↳ links to \S+/g, '').replace(/\s+/g, ' ').trim();
+  });
+}
+
+// Practice emails: no assistant, just learn the scale.
+const PRACTICE = [
+  { id: 'P1', truth: 'legit', fromName: 'Campus Weather', fromAddr: 'digest@weather.dunmore-uni.ie', time: '07:30',
+    subject: 'Your weekly campus weather digest',
+    body: `<p>Mostly dry this week with highs of 11°C. Showers likely Thursday afternoon – maybe pack an umbrella.</p>`, sig: 'Campus Weather' },
+  { id: 'P2', truth: 'phishing', fromName: 'Prize Desk', fromAddr: 'winner@global-prize-desk.biz', time: '07:41',
+    subject: 'YOU HAVE WON a brand-new phone!!!',
+    body: `<p>Congratulations!! You are today's lucky winner. Pay only €4.95 shipping to claim your prize.</p>${B('CLAIM NOW', 'http://global-prize-desk.biz/claim')}`, sig: 'Prize Desk' },
+];
+
+// Four counterbalancing versions: [round 1, round 2] = [condition, email set]
+const VERSIONS = {
+  1: [['suggest', 'A'], ['preselect', 'B']],
+  2: [['preselect', 'A'], ['suggest', 'B']],
+  3: [['suggest', 'B'], ['preselect', 'A']],
+  4: [['preselect', 'B'], ['suggest', 'A']],
+};
+// Instructed-response attention checks (one per round).
+const ATTENTION_TARGET = { 1: 33, 2: 100 };
+
+/* ==================================================================
+   3. STATE, PERSISTENCE AND DATA LOGGING
+   ================================================================== */
+const STATE_KEY = 'hcai_g7_state';
+const QUEUE_KEY = 'hcai_g7_queue';
+const BACKUP_KEY = 'hcai_g7_backup_rows';
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+if (params.get('reset')) { store.del(STATE_KEY); store.del(QUEUE_KEY); }
+
+let S = store.get(STATE_KEY, null);   // the whole session lives here
+function save() { store.set(STATE_KEY, S); }
+
+// One row per email or question. These are the columns of the "Responses" sheet.
+const COLUMNS = ['row_id', 'client_time', 'participant', 'attempt', 'version', 'mode', 'round', 'condition',
+  'email_set', 'item_type', 'item_id', 'position', 'truth', 'ai_rating', 'ai_correct', 'start', 'final',
+  'changed', 'ms', 'status'];
+
+function logRow(fields) {
+  S.seq = (S.seq || 0) + 1;
+  const row = {
+    row_id: `${S.participant}-${S.seq}-${Math.random().toString(36).slice(2, 6)}`,
+    client_time: new Date().toISOString(),
+    participant: S.participant, attempt: S.attempt, version: S.version, mode: MODE,
+    round: '', condition: '', email_set: '', item_type: '', item_id: '', position: '', truth: '',
+    ai_rating: '', ai_correct: '', start: '', final: '', changed: '', ms: '', status: '',
+    ...fields,
+  };
+  const q = store.get(QUEUE_KEY, []); q.push(row); store.set(QUEUE_KEY, q);
+  const b = store.get(BACKUP_KEY, []); b.push(row); store.set(BACKUP_KEY, b);
+  save();
+  flush();
+}
+
+async function api(payload) {
+  const res = await fetch(CONFIG.SCRIPT_URL, {
+    method: 'POST',
+    // text/plain avoids a CORS pre-flight, which Apps Script cannot answer
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'Server error');
+  return json;
+}
+
+let flushing = false, flushTimer = null;
+async function flush() {
+  if (MODE === 'demo' || flushing) { updateSaveStatus(); return; }
+  const q = store.get(QUEUE_KEY, []);
+  if (!q.length) { updateSaveStatus(); return; }
+  flushing = true;
+  const batch = q.slice(0, 40);
+  try {
+    await api({ action: 'log', rows: batch });
+    const ids = new Set(batch.map(r => r.row_id));
+    store.set(QUEUE_KEY, store.get(QUEUE_KEY, []).filter(r => !ids.has(r.row_id)));
+    flushing = false;
+    flush();
+  } catch (err) {
+    flushing = false;
+    clearTimeout(flushTimer);
+    flushTimer = setTimeout(flush, 3000);   // retry until it works
+    updateSaveStatus(true);
+  }
+}
+window.addEventListener('online', flush);
+
+function updateSaveStatus(failed) {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  const pending = store.get(QUEUE_KEY, []).length;
+  if (MODE === 'demo') { el.className = 'status'; el.textContent = 'Demo mode: responses are stored in this browser only.'; return; }
+  if (!pending) { el.className = 'status ok'; el.textContent = '✓ All your responses are saved. You can close this page.'; return; }
+  el.className = 'status';
+  el.textContent = failed ? `Saving… (${pending} waiting – retrying, please keep this page open)` : `Saving your responses… (${pending} left)`;
+}
+
+/* ==================================================================
+   4. BUILD THE SEQUENCE OF SCREENS FOR THIS PARTICIPANT
+   ================================================================== */
+function buildSteps(version) {
+  const steps = [{ type: 'instructions' }];
+  PRACTICE.forEach((email, i) => steps.push({ type: 'practice', email: email.id, idx: i + 1 }));
+  steps.push({ type: 'practiceDone' });
+  VERSIONS[version].forEach(([condition, set], r) => {
+    const round = r + 1;
+    steps.push({ type: 'roundIntro', round, condition, set });
+    EMAILS[set].forEach((e, i) => steps.push({ type: 'email', round, condition, set, email: e.id, idx: i + 1 }));
+    steps.push({ type: 'attention', round, condition, set });
+    steps.push({ type: 'agency', round, condition, set });
+  });
+  steps.push({ type: 'checks' });
+  steps.push({ type: 'debrief' });
+  return steps;
+}
+const findEmail = id => id.startsWith('P') ? PRACTICE.find(e => e.id === id) : EMAILS[id[0]][+id.slice(1) - 1];
+
+function next() { S.i += 1; save(); render(); window.scrollTo(0, 0); }
+
+/* ==================================================================
+   5. RENDERING
+   ================================================================== */
+const app = document.getElementById('app');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ICON = {
+  menu: '<path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>',
+  search: '<path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>',
+  back: '<path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>',
+  archive: '<path d="M20.54 5.23 19.15 3.55A1.45 1.45 0 0 0 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5 6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/>',
+  trash: '<path d="M6 19c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>',
+  more: '<path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>',
+  mail: '<path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/>',
+  pencil: '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>',
+  spark: '<path d="M12 2l2.2 6.3L20.5 10l-6.3 2.2L12 18.5l-2.2-6.3L3.5 10l6.3-1.7L12 2zm7 12 1 2.6 2.6 1-2.6 1L19 21.2l-1-2.6-2.6-1 2.6-1L19 14z"/>',
+};
+const icon = (name, cls = 'icon') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`;
+const AVATAR_COLOURS = ['#1a73e8', '#c5221f', '#188038', '#e37400', '#9334e6', '#007b83', '#b06000', '#3c4043'];
+function avatar(name) {
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `<div class="avatar" style="background:${AVATAR_COLOURS[h % AVATAR_COLOURS.length]}" aria-hidden="true">${esc(name[0])}</div>`;
+}
+
+// Wraps every screen in the mail-client chrome.
+function shell(inner, { pill = '', variant = 'search', unread = 0, dock = '' } = {}) {
+  const top = variant === 'reader'
+    ? `<span class="icon-btn" aria-disabled="true">${icon('back')}</span>
+       <span style="flex:1"></span>
+       <span class="icon-btn" aria-hidden="true">${icon('archive')}</span>
+       <span class="icon-btn" aria-hidden="true">${icon('trash')}</span>
+       ${pill ? `<span class="progress-pill">${pill}</span>` : ''}`
+    : `<span class="icon-btn" aria-hidden="true">${icon('menu')}</span>
+       <div class="search">${icon('search')}<span>Search in mail</span></div>
+       ${pill ? `<span class="progress-pill">${pill}</span>` : ''}
+       <div class="me" aria-hidden="true">${S && S.initial ? esc(S.initial) : 'Y'}</div>`;
+  app.innerHTML = `
+    ${MODE !== 'live' ? `<div class="mode-banner">${MODE === 'demo' ? 'DEMO MODE – not connected to the Google Sheet' : 'PILOT SESSION'}</div>` : ''}
+    <div class="layout">
+      <aside class="sidebar" aria-hidden="true">
+        <div class="brand">${icon('mail')} Mailbox</div>
+        <span class="compose">${icon('pencil')} Compose</span>
+        <div class="nav-item active"><span>Inbox</span><span>${unread || ''}</span></div>
+        <div class="nav-item"><span>Starred</span></div>
+        <div class="nav-item"><span>Snoozed</span></div>
+        <div class="nav-item"><span>Sent</span></div>
+        <div class="nav-item"><span>Drafts</span></div>
+        <div class="nav-item"><span>Spam</span></div>
+      </aside>
+      <div class="main">
+        <header class="topbar">${top}</header>
+        <main class="pane">${inner}${dock ? `<div class="dock"><div class="dock-inner">${dock}</div></div>` : ''}</main>
+      </div>
+    </div>`;
+}
+
+function scaleButtons(selected, name = 'rating') {
+  return `<div class="scale" role="group" aria-label="Your rating">${SCALE.map(s =>
+    `<button type="button" class="opt" data-${name}="${s.v}" aria-pressed="${selected === s.v}">${s.label}</button>`).join('')}</div>`;
+}
+
+function render() {
+  if (!S) return renderWelcome();
+  const step = S.steps[S.i];
+  ({
+    instructions: renderInstructions, practice: renderEmail, practiceDone: renderPracticeDone,
+    roundIntro: renderRoundIntro, email: renderEmail, attention: renderAttention,
+    agency: renderAgency, checks: renderChecks, debrief: renderDebrief,
+  })[step.type](step);
+}
+
+/* ---- Screen: welcome, consent, identity ---- */
+function renderWelcome(error = '') {
+  shell(`
+    <div class="content narrow">
+      <h1>${esc(CONFIG.STUDY_NAME)}</h1>
+      <p class="muted small">${esc(CONFIG.TEAM)}</p>
+      <div class="card">
+        <p style="margin-top:0"><b>What you'll do:</b> sort 20 short emails into Safe or Phishing, with help from an AI email assistant. It takes about <b>4–5 minutes</b> on your phone.</p>
+        <p><b>Your data:</b> we record your ratings and how long each one takes. ${CONFIG.COLLECT_IDENTITY
+          ? 'Your name and student ID are stored separately from your answers and are used only to confirm you took part and to stop anyone doing it twice. Your answers are analysed under a code (e.g. P007).'
+          : 'We do not record your name or any other personal details.'}
+          All data are deleted after marking.</p>
+        <p style="margin-bottom:0"><b>Taking part is voluntary.</b> You can stop at any time by closing this page.</p>
+      </div>
+      <form id="f" novalidate>
+        ${CONFIG.COLLECT_IDENTITY ? `
+          <label class="field">Full name<input id="name" autocomplete="name" required></label>
+          <label class="field">Student ID<input id="sid" inputmode="numeric" autocomplete="off" required></label>` : ''}
+        <label class="check"><input type="checkbox" id="consent"> <span>I have read the information above and agree to take part.</span></label>
+        ${error ? `<div class="error">${esc(error)}</div>` : ''}
+        <button class="primary" id="go" type="submit">Start</button>
+      </form>
+    </div>`);
+  document.getElementById('f').onsubmit = async ev => {
+    ev.preventDefault();
+    const name = CONFIG.COLLECT_IDENTITY ? document.getElementById('name').value.trim() : '';
+    const sid = CONFIG.COLLECT_IDENTITY ? document.getElementById('sid').value.trim() : '';
+    if (CONFIG.COLLECT_IDENTITY && (!name || !sid)) return renderWelcome('Please enter your name and student ID.');
+    if (!document.getElementById('consent').checked) return renderWelcome('Please tick the consent box to continue.');
+    const btn = document.getElementById('go'); btn.disabled = true; btn.textContent = 'Starting…';
+    try { await startSession(name, sid); }
+    catch (e) { renderWelcome('Could not reach the study server. Check your connection and try again.'); }
+  };
+}
+
+async function startSession(name, sid) {
+  let a;
+  const forced = +params.get('v');
+  if (MODE === 'demo') {
+    a = { participant: 'D' + Date.now().toString(36).slice(-5).toUpperCase(), attempt: 1, version: forced || 1 + Math.floor(Math.random() * 4) };
+  } else {
+    a = await api({ action: 'assign', name, student_id: sid, mode: MODE, forced_version: forced || '' });
+  }
+  S = {
+    participant: a.participant, attempt: a.attempt, version: a.version, initial: (name || 'Y')[0].toUpperCase(),
+    steps: buildSteps(a.version), i: 0, seq: 0, answers: {},
+  };
+  save();
+  render();
+}
+
+/* ---- Screen: instructions ---- */
+function renderInstructions() {
+  shell(`
+    <div class="content narrow">
+      <h1>How it works</h1>
+      <p>Imagine this is your university inbox. For each email, decide how likely it is to be a <b>phishing</b> email (a scam trying to get your password, money or personal details).</p>
+      <div class="scale-key">
+        <b>Safe</b><span>I'm confident it's genuine</span>
+        <b>Probably safe</b><span>Looks genuine, not certain</span>
+        <b>Probably phishing</b><span>Looks suspicious</span>
+        <b>Phishing</b><span>I'm confident it's a scam</span>
+      </div>
+      <p>An <b>AI email assistant</b> will also rate each email and give a risk score. It is usually right, but not always. <b>The final decision is yours.</b></p>
+      <p>Work at your normal pace. You can't go back to an email once you've submitted it. Links in the emails don't open.</p>
+      <p>First, two practice emails (no assistant).</p>
+      <button class="primary" id="go">Start practice</button>
+    </div>`);
+  document.getElementById('go').onclick = next;
+}
+
+/* ---- Screen: an email (practice or real) ---- */
+function renderEmail(step) {
+  const e = findEmail(step.email);
+  const practice = step.type === 'practice';
+  const pre = step.condition === 'preselect';
+  let selected = pre ? e.ai : null;            // the default
+  const startTime = performance.now();
+
+  const assistant = practice ? '' : `
+    <div class="assist" aria-live="polite">
+      <div class="assist-head">${icon('spark', 'icon')} Mail assistant</div>
+      <div class="verdict">${pre ? 'AI has rated this:' : 'AI suggests:'} <b>${LABEL[e.ai]}</b></div>
+      <div class="risk">Risk score <b>${e.risk}/100</b><span class="riskbar"><i style="width:${e.risk}%"></i></span></div>
+    </div>`;
+  const dock = `${assistant}
+    <p class="rate-label">${practice ? 'Practice – your rating' : 'Your rating'}</p>
+    <div id="scale">${scaleButtons(selected)}</div>
+    <button class="primary" id="submit" ${selected === null ? 'disabled' : ''}>Submit</button>`;
+  const pill = practice ? `Practice ${step.idx}/2` : `Round ${step.round} · ${step.idx}/10`;
+
+  shell(`
+    <div class="content narrow">
+      <div class="subject-row"><h1>${esc(e.subject)}</h1><span class="chip">Inbox</span></div>
+      <div class="sender">
+        ${avatar(e.fromName)}
+        <div class="who">
+          <div class="name">${esc(e.fromName)}</div>
+          <div class="addr">&lt;${esc(e.fromAddr)}&gt;</div>
+          <div class="to">to me</div>
+        </div>
+        <div class="time">${esc(e.time)}</div>
+      </div>
+      <div class="body">${e.body}<div class="sig">${esc(e.sig)}</div></div>
+    </div>`, { variant: 'reader', pill, dock });
+
+  const scaleEl = document.getElementById('scale');
+  const submit = document.getElementById('submit');
+  scaleEl.onclick = ev => {
+    const b = ev.target.closest('[data-rating]'); if (!b) return;
+    selected = +b.dataset.rating;
+    scaleEl.querySelectorAll('[data-rating]').forEach(x => x.setAttribute('aria-pressed', +x.dataset.rating === selected));
+    submit.disabled = false;
+  };
+  submit.onclick = () => {
+    if (selected === null) return;
+    submit.disabled = true;
+    const ms = Math.round(performance.now() - startTime);
+    if (practice) {
+      logRow({ round: 0, item_type: 'practice', item_id: e.id, position: step.idx, truth: e.truth, final: selected, ms, status: 'ok' });
+    } else {
+      logRow({
+        round: step.round, condition: step.condition, email_set: step.set, item_type: 'email', item_id: e.id,
+        position: e.pos, truth: e.truth, ai_rating: e.ai, ai_correct: e.aiCorrect ? 1 : 0,
+        start: pre ? e.ai : '', final: selected, changed: pre ? (selected !== e.ai ? 1 : 0) : '', ms, status: 'ok',
+      });
+      S.answers[e.id] = selected;
+    }
+    next();
+  };
+}
+
+function renderPracticeDone() {
+  shell(`
+    <div class="content narrow">
+      <h1>Practice done</h1>
+      <p>The first was a genuine weekly digest; the second was a classic prize scam (odd domain, pressure, a small payment).</p>
+      <p>Now the real task: <b>2 rounds of 10 emails</b>. From here on, the AI email assistant will rate each email too.</p>
+      <button class="primary" id="go">Continue</button>
+    </div>`);
+  document.getElementById('go').onclick = next;
+}
+
+/* ---- Screen: inbox listing at the start of a round ---- */
+function renderRoundIntro(step) {
+  const rows = EMAILS[step.set].map(e => `
+    <div class="mail-row">${avatar(e.fromName)}
+      <div class="meta">
+        <div class="line1"><span class="from">${esc(e.fromName)}</span><span class="time">${esc(e.time)}</span></div>
+        <div class="subj">${esc(e.subject)}</div>
+        <div class="snippet">${esc(e.preview)}</div>
+      </div>
+    </div>`).join('');
+  shell(`
+    <div class="content narrow" style="padding-bottom:8px">
+      <h1>Round ${step.round} of 2</h1>
+      <p>You have <b>10 new emails</b>. Open each one and rate it from Safe to Phishing. The AI email assistant will rate them too.</p>
+      <button class="primary" id="go">Open first email</button>
+    </div>
+    <div class="list-head"><span>Primary</span><span>1–10 of 10</span></div>
+    ${rows}`, { pill: `Round ${step.round}`, unread: 10 });
+  document.getElementById('go').onclick = next;
+}
+
+/* ---- Screen: attention check ---- */
+function renderAttention(step) {
+  const target = ATTENTION_TARGET[step.round];
+  let selected = null;
+  const t0 = performance.now();
+  shell(`
+    <div class="content narrow">
+      <h1>Quick check</h1>
+      <p>To show you're reading carefully, please choose <b>“${LABEL[target]}”</b> below and press Submit.</p>
+      <div id="scale">${scaleButtons(null)}</div>
+      <button class="primary" id="submit" disabled>Submit</button>
+    </div>`, { pill: `Round ${step.round}` });
+  const scaleEl = document.getElementById('scale'), submit = document.getElementById('submit');
+  scaleEl.onclick = ev => {
+    const b = ev.target.closest('[data-rating]'); if (!b) return;
+    selected = +b.dataset.rating;
+    scaleEl.querySelectorAll('[data-rating]').forEach(x => x.setAttribute('aria-pressed', +x.dataset.rating === selected));
+    submit.disabled = false;
+  };
+  submit.onclick = () => {
+    submit.disabled = true;
+    logRow({ round: step.round, condition: step.condition, email_set: step.set, item_type: 'attention',
+      item_id: `attention_${step.round}`, final: selected, ms: Math.round(performance.now() - t0),
+      status: selected === target ? 'pass' : 'fail' });
+    next();
+  };
+}
+
+/* ---- Screen: sense of agency (2 items, 1–7) ---- */
+const AGENCY_ITEMS = [
+  { id: 'agency_control', text: 'I felt in control of the decisions in this round.' },
+  { id: 'agency_own', text: 'The decisions in this round felt like my own.' },
+];
+function renderAgency(step) {
+  const ans = {};
+  const t0 = performance.now();
+  shell(`
+    <div class="content narrow">
+      <h1>About round ${step.round}</h1>
+      <p class="muted">How much do you agree with each statement? (1 = strongly disagree, 7 = strongly agree)</p>
+      ${AGENCY_ITEMS.map(it => `
+        <div class="card">
+          <div>${it.text}</div>
+          <div class="likert" role="group" aria-label="${esc(it.text)}" data-item="${it.id}">
+            ${[1, 2, 3, 4, 5, 6, 7].map(n => `<button type="button" class="opt" data-n="${n}" aria-pressed="false">${n}</button>`).join('')}
+          </div>
+          <div class="anchors"><span>Strongly disagree</span><span>Strongly agree</span></div>
+        </div>`).join('')}
+      <button class="primary" id="submit" disabled>Continue</button>
+    </div>`, { pill: `Round ${step.round}` });
+  const submit = document.getElementById('submit');
+  document.querySelectorAll('.likert').forEach(g => g.onclick = ev => {
+    const b = ev.target.closest('[data-n]'); if (!b) return;
+    ans[g.dataset.item] = +b.dataset.n;
+    g.querySelectorAll('[data-n]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    submit.disabled = Object.keys(ans).length < AGENCY_ITEMS.length;
+  });
+  submit.onclick = () => {
+    submit.disabled = true;
+    const ms = Math.round(performance.now() - t0);
+    AGENCY_ITEMS.forEach(it => logRow({ round: step.round, condition: step.condition, email_set: step.set,
+      item_type: 'agency', item_id: it.id, final: ans[it.id], ms, status: 'ok' }));
+    next();
+  };
+}
+
+/* ---- Screen: manipulation + credibility checks ---- */
+function renderChecks() {
+  const preRound = VERSIONS[S.version].findIndex(([c]) => c === 'preselect') + 1;
+  const Q = [
+    { id: 'manipulation', text: "In one round, the assistant's rating was already selected for you when each email opened. Which round was that?",
+      options: ['Round 1', 'Round 2', 'Neither', 'Not sure'] },
+    { id: 'credibility', text: 'During the task, did the assistant seem like a real AI system to you?',
+      options: ['Yes', 'Unsure', 'No'] },
+  ];
+  const ans = {};
+  const t0 = performance.now();
+  shell(`
+    <div class="content narrow">
+      <h1>Two last questions</h1>
+      ${Q.map(q => `
+        <div class="card"><div>${q.text}</div>
+          <div class="choice-list" data-q="${q.id}">
+            ${q.options.map(o => `<button type="button" class="opt" data-o="${esc(o)}" aria-pressed="false">${o}</button>`).join('')}
+          </div></div>`).join('')}
+      <button class="primary" id="submit" disabled>See my results</button>
+    </div>`);
+  const submit = document.getElementById('submit');
+  document.querySelectorAll('.choice-list').forEach(g => g.onclick = ev => {
+    const b = ev.target.closest('[data-o]'); if (!b) return;
+    ans[g.dataset.q] = b.dataset.o;
+    g.querySelectorAll('[data-o]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    submit.disabled = Object.keys(ans).length < Q.length;
+  });
+  submit.onclick = () => {
+    submit.disabled = true;
+    const ms = Math.round(performance.now() - t0);
+    logRow({ item_type: 'manipulation', item_id: 'manipulation', final: ans.manipulation, ms,
+      status: ans.manipulation === `Round ${preRound}` ? 'pass' : 'fail' });
+    logRow({ item_type: 'credibility', item_id: 'credibility', final: ans.credibility, ms, status: 'ok' });
+    // Final row marks the session complete and stores the score.
+    const correct = Object.entries(S.answers).filter(([id, v]) => {
+      const e = findEmail(id); return e.truth === 'phishing' ? v >= 67 : v <= 33;
+    }).length;
+    S.score = correct;
+    logRow({ item_type: 'complete', item_id: 'complete', final: correct, status: 'complete' });
+    next();
+  };
+}
+
+/* ---- Screen: debrief ---- */
+function renderDebrief() {
+  const wrong = VERSIONS[S.version].flatMap(([, set]) => EMAILS[set].filter(e => !e.aiCorrect));
+  shell(`
+    <div class="content narrow">
+      <h1>Thank you!</h1>
+      <div id="save-status" class="status">Saving…</div>
+      <p>You classified</p>
+      <div class="score">${S.score} / 20</div>
+      <p>emails correctly (Safe/Probably safe for genuine emails, Probably phishing/Phishing for scams).</p>
+      <h2>What this study was about</h2>
+      <p>The “AI assistant” was <b>scripted</b>: there was no real AI. Its ratings were fixed in advance and it was deliberately wrong on <b>6 of the 20 emails</b> (3 per round). We are testing whether people accept more of an AI's mistakes when its answer is <b>already selected</b> for them (one round) than when it is only <b>suggested</b> (the other round).</p>
+      <p>The emails it got wrong:</p>
+      <ul class="wrong-list">${wrong.map(e => `<li><b>${esc(e.subject)}</b> – actually ${e.truth === 'phishing' ? 'phishing' : 'genuine'}. AI said “${LABEL[e.ai]}”, you said “${LABEL[S.answers[e.id]] ?? '–'}”. <span class="muted">${esc(e.cue)}</span></li>`).join('')}</ul>
+      <div class="notice"><b>Please don't discuss the study</b> with classmates until everyone has taken part. It would affect their answers.</div>
+      <p class="muted small">All organisations in the emails are fictional. Participant code: ${esc(S.participant)}. Questions? Contact ${esc(CONFIG.TEAM)}.</p>
+      ${MODE === 'demo' ? `<button class="secondary" id="dl">Download data from this browser (CSV)</button>
+        <button class="secondary" id="again" style="margin-left:6px">Run another demo participant</button>` : ''}
+    </div>`);
+  updateSaveStatus();
+  flush();
+  if (MODE === 'demo') {
+    document.getElementById('dl').onclick = downloadBackup;
+    document.getElementById('again').onclick = () => { store.del(STATE_KEY); S = null; render(); };
+  }
+}
+
+function downloadBackup() {
+  const rows = store.get(BACKUP_KEY, []);
+  const csv = [COLUMNS.join(',')].concat(rows.map(r => COLUMNS.map(c => {
+    const v = r[c] ?? ''; return /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v;
+  }).join(','))).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'responses_demo.csv';
+  a.click();
+}
+
+/* ---- Go ---- */
+render();
+flush();   // send anything left over from a previous visit
+</script>
+</body>
+</html>
