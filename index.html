@@ -563,7 +563,8 @@ function renderInstructions() {
         <b>Phishing</b><span>I'm confident it's a scam</span>
       </div>
       <p>An <b>AI email assistant</b> will also rate each email and give a risk score. It is usually right, but not always. <b>The final decision is yours.</b></p>
-      <p>Work at your normal pace. You can't go back to an email once you've submitted it. Links in the emails don't open.</p>
+      <div class="notice"><b>Please try to be as accurate as you can.</b> Treat each email as if it had landed in your own inbox: a scam marked “Safe” could cost you your password or your money. At the end you'll see your <b>score out of 20</b>.</div>
+      <p>You can't go back to an email once you've submitted it. Links in the emails don't open.</p>
       <p>First, two practice emails (no assistant).</p>
       <button class="primary" id="go">Start practice</button>
     </div>`);
@@ -656,6 +657,7 @@ function renderRoundIntro(step) {
     <div class="content narrow" style="padding-bottom:8px">
       <h1>Round ${step.round} of 2</h1>
       <p>You have <b>10 new emails</b>. Open each one and rate it from Safe to Phishing. The AI email assistant will rate them too.</p>
+      <p>Aim for as many correct as you can – every email counts towards your score out of 20.</p>
       <button class="primary" id="go">Open first email</button>
     </div>
     <div class="list-head"><span>Primary</span><span>1–10 of 10</span></div>
